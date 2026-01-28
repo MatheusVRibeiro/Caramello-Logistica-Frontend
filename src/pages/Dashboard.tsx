@@ -1,3 +1,4 @@
+import { useState, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { MonthlyComparison } from "@/components/dashboard/MonthlyComparison";
@@ -5,101 +6,271 @@ import { SmartAlerts, SmartAlert } from "@/components/dashboard/SmartAlerts";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { ProfitChart } from "@/components/dashboard/ProfitChart";
 import { DriversRanking } from "@/components/dashboard/DriversRanking";
-import { Route, DollarSign, TrendingDown, TrendingUp } from "lucide-react";
+import { Package, Truck, DollarSign, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  Area,
+  AreaChart,
+} from "recharts";
 
-// Demo data for monthly comparison
-const monthlyData = {
-  mesAtual: { receita: 295000, custos: 205000, resultado: 90000 },
-  mesAnterior: { receita: 272000, custos: 195000, resultado: 77000 },
-};
+// Simulação de dados de fretes - em produção virá do backend
+const fretesSimulados = [
+  { id: "#1250", status: "em_transito", receita: 6750, custos: 1720, resultado: 5030, quantidadeSacas: 450, motorista: "Carlos Silva", motoristaId: "1", mes: "jan" },
+  { id: "#1249", status: "concluido", receita: 7600, custos: 1690, resultado: 5910, quantidadeSacas: 380, motorista: "João Oliveira", motoristaId: "2", mes: "jan" },
+  { id: "#1248", status: "pendente", receita: 7500, custos: 0, resultado: 7500, quantidadeSacas: 500, motorista: "Pedro Santos", motoristaId: "3", mes: "jan" },
+  { id: "#1247", status: "concluido", receita: 7500, custos: 1720, resultado: 5780, quantidadeSacas: 300, motorista: "André Costa", motoristaId: "4", mes: "jan" },
+  { id: "#1246", status: "cancelado", receita: 0, custos: 0, resultado: 0, quantidadeSacas: 0, motorista: "Lucas Ferreira", motoristaId: "5", mes: "jan" },
+  { id: "#1245", status: "concluido", receita: 6000, custos: 1650, resultado: 4350, quantidadeSacas: 400, motorista: "Carlos Silva", motoristaId: "1", mes: "jan" },
+  { id: "#1244", status: "concluido", receita: 5250, custos: 1580, resultado: 3670, quantidadeSacas: 350, motorista: "João Oliveira", motoristaId: "2", mes: "jan" },
+  { id: "#1243", status: "em_transito", receita: 6750, custos: 1700, resultado: 5050, quantidadeSacas: 450, motorista: "Pedro Santos", motoristaId: "3", mes: "jan" },
+  // Dados do mês anterior (dez)
+  { id: "#1200", status: "concluido", receita: 6000, custos: 1600, resultado: 4400, quantidadeSacas: 400, motorista: "Carlos Silva", motoristaId: "1", mes: "dez" },
+  { id: "#1201", status: "concluido", receita: 7200, custos: 1680, resultado: 5520, quantidadeSacas: 360, motorista: "João Oliveira", motoristaId: "2", mes: "dez" },
+  { id: "#1202", status: "concluido", receita: 6750, custos: 1620, resultado: 5130, quantidadeSacas: 450, motorista: "Pedro Santos", motoristaId: "3", mes: "dez" },
+  { id: "#1203", status: "concluido", receita: 7000, custos: 1700, resultado: 5300, quantidadeSacas: 280, motorista: "André Costa", motoristaId: "4", mes: "dez" },
+  { id: "#1204", status: "concluido", receita: 5500, custos: 1550, resultado: 3950, quantidadeSacas: 380, motorista: "Lucas Ferreira", motoristaId: "5", mes: "dez" },
+];
 
-// Demo smart alerts
+const totalCaminhoes = 5;
+
 const smartAlerts: SmartAlert[] = [
   {
     id: "1",
-    type: "danger",
+    type: "warning",
     icon: "margin",
-    title: "Frete com margem abaixo de 10%",
-    description: "Frete #1247 (SP → RJ) está com margem de apenas 8%. Considere revisar os custos.",
+    title: "Safra do Amendoim - Alta Temporada",
+    description: "Período de colheita iniciando. Aumento de demanda previsto em 35% para os próximos 30 dias.",
     action: {
-      label: "Ver frete",
-      onClick: () => toast.info("Navegando para detalhes do frete #1247"),
+      label: "Ver previsões",
+      onClick: () => toast.info("Preparando relatório de previsão de demanda"),
     },
   },
   {
     id: "2",
-    type: "warning",
-    icon: "cost",
-    title: "Caminhão com custo elevado",
-    description: "O caminhão ABC-1234 teve custo 25% acima da média este mês.",
+    type: "info",
+    icon: "truck",
+    title: "Eficiência da Frota",
+    description: "Taxa de ocupação em 40% - 3 caminhões disponíveis para novos fretes.",
     action: {
-      label: "Analisar custos",
-      onClick: () => toast.info("Abrindo análise de custos"),
+      label: "Ver frota",
+      onClick: () => toast.info("Navegando para gestão de caminhões"),
     },
   },
   {
     id: "3",
-    type: "warning",
-    icon: "margin",
-    title: "3 fretes com margem baixa",
-    description: "Fretes para a região Sul estão com margens entre 5% e 10%.",
+    type: "danger",
+    icon: "cost",
+    title: "Custo por Saca Elevado",
+    description: "Custo médio subiu para R$ 3,85/saca. Considere otimização de rotas e revisão de custos.",
     action: {
-      label: "Ver fretes",
-      onClick: () => toast.info("Filtrando fretes da região Sul"),
+      label: "Analisar custos",
+      onClick: () => toast.info("Abrindo análise detalhada de custos"),
     },
   },
   {
     id: "4",
     type: "info",
-    icon: "truck",
-    title: "Manutenção programada",
-    description: "2 caminhões precisam de revisão nos próximos 7 dias.",
+    icon: "margin",
+    title: "Top Motorista do Mês",
+    description: "André Costa lidera com R$ 15.690 de lucro acumulado. Margem média de 77%.",
     action: {
-      label: "Ver agenda",
-      onClick: () => toast.info("Abrindo agenda de manutenção"),
+      label: "Ver ranking",
+      onClick: () => toast.info("Abrindo ranking completo de motoristas"),
     },
   },
 ];
 
 export default function Dashboard() {
+  const [alerts, setAlerts] = useState(smartAlerts);
+  const [modalAberto, setModalAberto] = useState<"sacas" | "ocupacao" | "custos" | "resultado" | null>(null);
+
   const handleDismissAlert = (id: string) => {
+    setAlerts(alerts.filter((alert) => alert.id !== id));
     toast.success("Alerta dispensado");
   };
 
+  // Calcular KPIs específicos para logística de amendoim
+  const kpis = useMemo(() => {
+    const fretesJaneiro = fretesSimulados.filter(f => f.mes === "jan" && f.status !== "cancelado");
+    const fretesDezembro = fretesSimulados.filter(f => f.mes === "dez");
+    const fretesAtivos = fretesJaneiro.filter(f => f.status === "em_transito").length;
+    
+    // Janeiro
+    const totalSacasJan = fretesJaneiro.reduce((acc, f) => acc + f.quantidadeSacas, 0);
+    const totalReceitaJan = fretesJaneiro.reduce((acc, f) => acc + f.receita, 0);
+    const totalCustosJan = fretesJaneiro.reduce((acc, f) => acc + f.custos, 0);
+    const totalResultadoJan = totalReceitaJan - totalCustosJan;
+    
+    // Dezembro
+    const totalSacasDez = fretesDezembro.reduce((acc, f) => acc + f.quantidadeSacas, 0);
+    const totalReceitaDez = fretesDezembro.reduce((acc, f) => acc + f.receita, 0);
+    const totalCustosDez = fretesDezembro.reduce((acc, f) => acc + f.custos, 0);
+    const totalResultadoDez = totalReceitaDez - totalCustosDez;
+    
+    // Custo médio por saca (apenas fretes concluídos com custo)
+    const fretesComCusto = fretesJaneiro.filter(f => f.custos > 0);
+    const sacasComCusto = fretesComCusto.reduce((acc, f) => acc + f.quantidadeSacas, 0);
+    const custoPorSaca = sacasComCusto > 0 ? totalCustosJan / sacasComCusto : 0;
+    
+    const fretesComCustoDez = fretesDezembro.filter(f => f.custos > 0);
+    const sacasComCustoDez = fretesComCustoDez.reduce((acc, f) => acc + f.quantidadeSacas, 0);
+    const custoPorSacaDez = sacasComCustoDez > 0 ? totalCustosDez / sacasComCustoDez : 0;
+    
+    // Taxa de ocupação da frota (fretes ativos / total de caminhões)
+    const taxaOcupacao = (fretesAtivos / totalCaminhoes) * 100;
+    
+    // Calcular trends
+    const trendSacas = totalSacasDez > 0 ? ((totalSacasJan - totalSacasDez) / totalSacasDez) * 100 : 0;
+    const trendCustoPorSaca = custoPorSacaDez > 0 ? ((custoPorSaca - custoPorSacaDez) / custoPorSacaDez) * 100 : 0;
+    const trendResultado = totalResultadoDez > 0 ? ((totalResultadoJan - totalResultadoDez) / totalResultadoDez) * 100 : 0;
+    
+    return {
+      janeiro: {
+        fretesAtivos,
+        totalSacas: totalSacasJan,
+        totalReceita: totalReceitaJan,
+        totalCustos: totalCustosJan,
+        totalResultado: totalResultadoJan,
+        custoPorSaca,
+        taxaOcupacao,
+      },
+      dezembro: {
+        totalSacas: totalSacasDez,
+        totalReceita: totalReceitaDez,
+        totalCustos: totalCustosDez,
+        totalResultado: totalResultadoDez,
+        custoPorSaca: custoPorSacaDez,
+      },
+      trends: {
+        sacas: trendSacas,
+        custoPorSaca: trendCustoPorSaca,
+        resultado: trendResultado,
+      },
+    };
+  }, []);
+
+  const monthlyData = {
+    mesAtual: {
+      receita: kpis.janeiro.totalReceita,
+      custos: kpis.janeiro.totalCustos,
+      resultado: kpis.janeiro.totalResultado,
+    },
+    mesAnterior: {
+      receita: kpis.dezembro.totalReceita,
+      custos: kpis.dezembro.totalCustos,
+      resultado: kpis.dezembro.totalResultado,
+    },
+  };
+
+  // Dados para gráfico de sacas transportadas (últimos 6 meses)
+  const dadosSacasMensais = [
+    { mes: "Ago/24", sacas: 2100, meta: 2500 },
+    { mes: "Set/24", sacas: 2350, meta: 2500 },
+    { mes: "Out/24", sacas: 2200, meta: 2500 },
+    { mes: "Nov/24", sacas: 1950, meta: 2500 },
+    { mes: "Dez/24", sacas: kpis.dezembro.totalSacas, meta: 2500 },
+    { mes: "Jan/25", sacas: kpis.janeiro.totalSacas, meta: 2500 },
+  ];
+
+  // Dados para gráfico de taxa de ocupação (últimas 4 semanas)
+  const dadosOcupacaoSemanal = [
+    { semana: "Semana 1", ocupacao: 80, disponivel: 20 },
+    { semana: "Semana 2", ocupacao: 60, disponivel: 40 },
+    { semana: "Semana 3", ocupacao: 100, disponivel: 0 },
+    { semana: "Semana 4", ocupacao: kpis.janeiro.taxaOcupacao, disponivel: 100 - kpis.janeiro.taxaOcupacao },
+  ];
+
+  // Dados para gráfico de custo por saca (últimos 6 meses)
+  const dadosCustoMensal = [
+    { mes: "Ago/24", custoPorSaca: 3.20, combustivel: 2.10, motorista: 0.90, manutencao: 0.20 },
+    { mes: "Set/24", custoPorSaca: 3.35, combustivel: 2.20, motorista: 0.95, manutencao: 0.20 },
+    { mes: "Out/24", custoPorSaca: 3.50, combustivel: 2.30, motorista: 1.00, manutencao: 0.20 },
+    { mes: "Nov/24", custoPorSaca: 3.70, combustivel: 2.50, motorista: 1.00, manutencao: 0.20 },
+    { mes: "Dez/24", custoPorSaca: kpis.dezembro.custoPorSaca, combustivel: 2.60, motorista: 1.05, manutencao: 0.20 },
+    { mes: "Jan/25", custoPorSaca: kpis.janeiro.custoPorSaca, combustivel: 2.70, motorista: 1.00, manutencao: 0.15 },
+  ];
+
+  // Dados para gráfico de resultado mensal (últimos 6 meses)
+  const dadosResultadoMensal = [
+    { mes: "Ago/24", receita: 31500, custos: 8400, lucro: 23100 },
+    { mes: "Set/24", receita: 35250, custos: 7875, lucro: 27375 },
+    { mes: "Out/24", receita: 33000, custos: 7700, lucro: 25300 },
+    { mes: "Nov/24", receita: 29250, custos: 7215, lucro: 22035 },
+    { mes: "Dez/24", receita: kpis.dezembro.totalReceita, custos: kpis.dezembro.totalCustos, lucro: kpis.dezembro.totalResultado },
+    { mes: "Jan/25", receita: kpis.janeiro.totalReceita, custos: kpis.janeiro.totalCustos, lucro: kpis.janeiro.totalResultado },
+  ];
+
   return (
-    <MainLayout title="Dashboard" subtitle="Visão geral do sistema">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <MainLayout
+      title="Dashboard"
+      subtitle="Visão geral das operações de logística de amendoim"
+    >
+      {/* KPI Cards - Específicos para Amendoim */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <KPICard
-          title="Fretes Ativos"
-          value="47"
-          icon={<Route className="h-5 w-5" />}
-          trend={{ value: 12, isPositive: true }}
-          tooltip="Número de fretes em andamento no momento"
+          title="Sacas Transportadas"
+          value={`${kpis.janeiro.totalSacas.toLocaleString()} sacas`}
+          icon={Package}
+          variant="primary"
+          trend={{
+            value: Math.abs(kpis.trends.sacas),
+            isPositive: kpis.trends.sacas >= 0,
+          }}
+          tooltip={`Total de sacas transportadas em Janeiro. Equivale a ~${(kpis.janeiro.totalSacas * 25 / 1000).toFixed(1)} toneladas. Clique para ver detalhes`}
+          onClick={() => setModalAberto("sacas")}
         />
         <KPICard
-          title="Receita Total"
-          value="R$ 295.000"
-          icon={<DollarSign className="h-5 w-5" />}
-          trend={{ value: 8, isPositive: true }}
-          tooltip="Soma de todas as receitas do mês atual"
+          title="Taxa de Ocupação"
+          value={`${kpis.janeiro.taxaOcupacao.toFixed(0)}%`}
+          icon={Truck}
+          variant="active"
+          trend={{
+            value: 5,
+            isPositive: true,
+          }}
+          tooltip={`${kpis.janeiro.fretesAtivos} de ${totalCaminhoes} caminhões atualmente em uso. ${totalCaminhoes - kpis.janeiro.fretesAtivos} disponíveis. Clique para ver histórico`}
+          onClick={() => setModalAberto("ocupacao")}
         />
         <KPICard
-          title="Custos Totais"
-          value="R$ 205.000"
-          icon={<TrendingDown className="h-5 w-5" />}
+          title="Custo por Saca"
+          value={`R$ ${kpis.janeiro.custoPorSaca.toFixed(2)}`}
+          icon={DollarSign}
           variant="loss"
-          trend={{ value: 5, isPositive: false }}
-          tooltip="Total de despesas operacionais do mês"
+          trend={{
+            value: Math.abs(kpis.trends.custoPorSaca),
+            isPositive: kpis.trends.custoPorSaca <= 0,
+          }}
+          tooltip="Custo médio por saca transportada (combustível + motorista + manutenção). Clique para ver breakdown"
+          onClick={() => setModalAberto("custos")}
         />
         <KPICard
-          title="Lucro Líquido"
-          value="R$ 90.000"
-          icon={<TrendingUp className="h-5 w-5" />}
+          title="Resultado do Mês"
+          value={`R$ ${(kpis.janeiro.totalResultado / 1000).toFixed(1)}k`}
+          icon={TrendingUp}
           variant="profit"
-          trend={{ value: 15, isPositive: true }}
-          tooltip="Receita menos custos do período"
+          trend={{
+            value: Math.abs(kpis.trends.resultado),
+            isPositive: kpis.trends.resultado >= 0,
+          }}
+          tooltip={`Receita R$ ${(kpis.janeiro.totalReceita / 1000).toFixed(0)}k - Custos R$ ${(kpis.janeiro.totalCustos / 1000).toFixed(0)}k = Lucro R$ ${(kpis.janeiro.totalResultado / 1000).toFixed(1)}k. Clique para análise detalhada`}
+          onClick={() => setModalAberto("resultado")}
         />
       </div>
 
@@ -108,10 +279,10 @@ export default function Dashboard() {
         <MonthlyComparison
           mesAtual={monthlyData.mesAtual}
           mesAnterior={monthlyData.mesAnterior}
-          labelMesAtual="Jan/2024"
-          labelMesAnterior="Dez/2023"
+          labelMesAtual="Jan/2025"
+          labelMesAnterior="Dez/2024"
         />
-        <SmartAlerts alerts={smartAlerts} onDismiss={handleDismissAlert} />
+        <SmartAlerts alerts={alerts} onDismiss={handleDismissAlert} />
       </div>
 
       {/* Charts */}
@@ -124,6 +295,316 @@ export default function Dashboard() {
       <div className="grid grid-cols-1">
         <DriversRanking />
       </div>
+
+      {/* Modal: Sacas Transportadas */}
+      <Dialog open={modalAberto === "sacas"} onOpenChange={() => setModalAberto(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Sacas Transportadas - Análise Detalhada</DialogTitle>
+            <DialogDescription>
+              Comparativo mensal dos últimos 6 meses com meta estabelecida
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Estatísticas Rápidas */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <p className="text-sm text-muted-foreground">Total (6 meses)</p>
+                <p className="text-2xl font-bold text-primary">
+                  {dadosSacasMensais.reduce((acc, d) => acc + d.sacas, 0).toLocaleString()} sacas
+                </p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Média Mensal</p>
+                <p className="text-2xl font-bold">
+                  {Math.round(dadosSacasMensais.reduce((acc, d) => acc + d.sacas, 0) / 6).toLocaleString()} sacas
+                </p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Meta Mensal</p>
+                <p className="text-2xl font-bold">2.500 sacas</p>
+              </div>
+            </div>
+
+            {/* Gráfico de Barras */}
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dadosSacasMensais}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="mes" />
+                  <YAxis />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Legend />
+                  <Bar dataKey="sacas" name="Sacas Transportadas" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="meta" name="Meta" fill="hsl(var(--muted-foreground))" radius={[8, 8, 0, 0]} opacity={0.3} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Análise */}
+            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+              <h4 className="font-semibold">📊 Análise</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• Janeiro atingiu {((kpis.janeiro.totalSacas / 2500) * 100).toFixed(1)}% da meta mensal</li>
+                <li>• Crescimento de {kpis.trends.sacas.toFixed(1)}% em relação a Dezembro</li>
+                <li>• Equivalente a {(kpis.janeiro.totalSacas * 25 / 1000).toFixed(1)} toneladas transportadas</li>
+              </ul>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Custo por Saca */}
+      <Dialog open={modalAberto === "custos"} onOpenChange={() => setModalAberto(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Custo por Saca - Análise Detalhada</DialogTitle>
+            <DialogDescription>
+              Evolução mensal dos custos operacionais por saca de amendoim transportada
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Estatísticas Rápidas */}
+            <div className="grid grid-cols-4 gap-4">
+              <div className="p-4 bg-loss/5 rounded-lg border border-loss/20">
+                <p className="text-sm text-muted-foreground">Custo Atual</p>
+                <p className="text-2xl font-bold text-loss">
+                  R$ {kpis.janeiro.custoPorSaca.toFixed(2)}
+                </p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Combustível</p>
+                <p className="text-xl font-bold">R$ 2,70</p>
+                <p className="text-xs text-muted-foreground">70% do custo</p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Motorista</p>
+                <p className="text-xl font-bold">R$ 1,00</p>
+                <p className="text-xs text-muted-foreground">26% do custo</p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Manutenção</p>
+                <p className="text-xl font-bold">R$ 0,15</p>
+                <p className="text-xs text-muted-foreground">4% do custo</p>
+              </div>
+            </div>
+
+            {/* Gráfico de Linha */}
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={dadosCustoMensal}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="mes" />
+                  <YAxis domain={[0, 4]} />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => `R$ ${value.toFixed(2)}`}
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="custoPorSaca"
+                    name="Custo Total/Saca"
+                    stroke="hsl(var(--loss))"
+                    strokeWidth={3}
+                    dot={{ fill: "hsl(var(--loss))", r: 5 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="combustivel"
+                    name="Combustível"
+                    stroke="hsl(var(--warning))"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="motorista"
+                    name="Motorista"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Análise */}
+            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+              <h4 className="font-semibold">💰 Análise de Custos</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• Custo médio dos últimos 6 meses: R$ {(dadosCustoMensal.reduce((acc, d) => acc + d.custoPorSaca, 0) / 6).toFixed(2)}/saca</li>
+                <li>• Combustível representa 70% do custo total - principal fator de variação</li>
+                <li>• Aumento de {kpis.trends.custoPorSaca.toFixed(1)}% em relação a Dezembro</li>
+                <li>• Recomendação: Otimizar rotas para reduzir consumo de combustível</li>
+              </ul>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Taxa de Ocupação */}
+      <Dialog open={modalAberto === "ocupacao"} onOpenChange={() => setModalAberto(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Taxa de Ocupação da Frota - Últimas 4 Semanas</DialogTitle>
+            <DialogDescription>
+              Monitoramento da utilização dos caminhões e capacidade ociosa
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Estatísticas Rápidas */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-active/10 rounded-lg border border-active/20">
+                <p className="text-sm text-muted-foreground">Ocupação Atual</p>
+                <p className="text-2xl font-bold text-active">
+                  {kpis.janeiro.taxaOcupacao.toFixed(0)}%
+                </p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Caminhões Ativos</p>
+                <p className="text-2xl font-bold">
+                  {kpis.janeiro.fretesAtivos} / {totalCaminhoes}
+                </p>
+              </div>
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">Disponíveis</p>
+                <p className="text-2xl font-bold">
+                  {totalCaminhoes - kpis.janeiro.fretesAtivos} caminhões
+                </p>
+              </div>
+            </div>
+
+            {/* Gráfico de Área */}
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={dadosOcupacaoSemanal}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="semana" />
+                  <YAxis domain={[0, 100]} />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => `${value}%`}
+                  />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="ocupacao"
+                    name="Taxa de Ocupação"
+                    stackId="1"
+                    stroke="hsl(var(--active))"
+                    fill="hsl(var(--active))"
+                    fillOpacity={0.6}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="disponivel"
+                    name="Capacidade Ociosa"
+                    stackId="1"
+                    stroke="hsl(var(--muted-foreground))"
+                    fill="hsl(var(--muted-foreground))"
+                    fillOpacity={0.2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Análise */}
+            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+              <h4 className="font-semibold">🚛 Análise da Frota</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• Ocupação média do mês: {dadosOcupacaoSemanal.reduce((acc, d) => acc + d.ocupacao, 0) / 4}%</li>
+                <li>• Pico de ocupação na Semana 3 (100% da frota utilizada)</li>
+                <li>• {totalCaminhoes - kpis.janeiro.fretesAtivos} caminhões disponíveis para novos fretes</li>
+                <li>• Recomendação: {kpis.janeiro.taxaOcupacao > 80 ? "Considerar expansão da frota" : "Capacidade adequada para demanda atual"}</li>
+              </ul>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Resultado do Mês */}
+      <Dialog open={modalAberto === "resultado"} onOpenChange={() => setModalAberto(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Resultado Mensal - Análise Financeira</DialogTitle>
+            <DialogDescription>
+              Comparativo de receitas, custos e lucro líquido dos últimos 6 meses
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Estatísticas Rápidas */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <p className="text-sm text-muted-foreground">Receita Jan/25</p>
+                <p className="text-2xl font-bold text-primary">
+                  R$ {(kpis.janeiro.totalReceita / 1000).toFixed(1)}k
+                </p>
+              </div>
+              <div className="p-4 bg-loss/5 rounded-lg border border-loss/20">
+                <p className="text-sm text-muted-foreground">Custos Jan/25</p>
+                <p className="text-2xl font-bold text-loss">
+                  R$ {(kpis.janeiro.totalCustos / 1000).toFixed(1)}k
+                </p>
+              </div>
+              <div className="p-4 bg-profit/5 rounded-lg border border-profit/20">
+                <p className="text-sm text-muted-foreground">Lucro Jan/25</p>
+                <p className="text-2xl font-bold text-profit">
+                  R$ {(kpis.janeiro.totalResultado / 1000).toFixed(1)}k
+                </p>
+              </div>
+            </div>
+
+            {/* Gráfico de Barras Empilhadas */}
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={dadosResultadoMensal}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="mes" />
+                  <YAxis />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => `R$ ${(value / 1000).toFixed(1)}k`}
+                  />
+                  <Legend />
+                  <Bar dataKey="receita" name="Receita" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="custos" name="Custos" fill="hsl(var(--loss))" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="lucro" name="Lucro Líquido" fill="hsl(var(--profit))" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Análise */}
+            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+              <h4 className="font-semibold">📊 Análise Financeira</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>• Lucro total dos últimos 6 meses: R$ {(dadosResultadoMensal.reduce((acc, d) => acc + d.lucro, 0) / 1000).toFixed(1)}k</li>
+                <li>• Margem de lucro em Janeiro: {((kpis.janeiro.totalResultado / kpis.janeiro.totalReceita) * 100).toFixed(1)}%</li>
+                <li>• Crescimento de {kpis.trends.resultado.toFixed(1)}% no resultado vs. mês anterior</li>
+                <li>• Melhor mês: Set/24 com R$ 27,4k de lucro líquido</li>
+              </ul>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 }

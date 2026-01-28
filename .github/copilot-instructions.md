@@ -1,7 +1,7 @@
 # Copilot Instructions - RN Logística Fretes Inteligentes
 
 ## Visão Geral do Projeto
-Sistema de gestão de logística e fretes para TCC, desenvolvido com React + TypeScript + Vite. Gerado com Lovable.dev. Foco em gerenciamento de fretes, caminhões, motoristas, mercadorias, custos e indicadores operacionais.
+Sistema de gestão de logística e fretes para TCC, desenvolvido com React + TypeScript + Vite. Foco em gerenciamento de fretes, caminhões, motoristas, mercadorias, custos e indicadores operacionais.
 
 ## Stack Tecnológica
 - **Framework**: React 18 + TypeScript + Vite
@@ -16,17 +16,17 @@ Sistema de gestão de logística e fretes para TCC, desenvolvido com React + Typ
 ## Estrutura da Aplicação
 
 ### Arquitetura de Rotas
-Todas as rotas (exceto `/login`) são protegidas por `ProtectedRoute`. Ver [src/App.tsx](../src/App.tsx) para configuração centralizada de rotas.
+Todas as rotas (exceto `/login`) são protegidas por `ProtectedRoute`. Ver `src/App.tsx` para configuração centralizada de rotas.
 
 ### Sistema de Autenticação
-- Contexto: [src/auth/AuthContext.tsx](../src/auth/AuthContext.tsx)
+- Contexto: `src/auth/AuthContext.tsx`
 - Demo users hardcoded (admin@rnlogistica.com / operador@rnlogistica.com)
 - Sessão persistida via `localStorage` com chave `rn_logistica_user`
 - Roles definidas: `admin`, `operador`, `motorista`
 - **Permissões**: Foco atual apenas em `admin` (gestor) - outras roles reservadas para expansão futura
 
 ### Layout Padrão
-Todas as páginas autenticadas usam `MainLayout` ([src/components/layout/MainLayout.tsx](../src/components/layout/MainLayout.tsx)):
+Todas as páginas autenticadas usam `MainLayout` (`src/components/layout/MainLayout.tsx`):
 - Sidebar fixa com navegação (`AppSidebar`)
 - Header com título e subtítulo
 - Área de conteúdo com scroll
@@ -34,7 +34,7 @@ Todas as páginas autenticadas usam `MainLayout` ([src/components/layout/MainLay
 ### Padrões de Componentes
 
 #### Páginas CRUD
-Estrutura padrão vista em [src/pages/Fretes.tsx](../src/pages/Fretes.tsx), [src/pages/Caminhoes.tsx](../src/pages/Caminhoes.tsx):
+Estrutura padrão vista em `src/pages/Fretes.tsx`, `src/pages/Caminhoes.tsx`:
 - `MainLayout` com título/subtítulo
 - `PageHeader` com botão de ação primária
 - `FilterBar` para busca e filtros
@@ -42,7 +42,7 @@ Estrutura padrão vista em [src/pages/Fretes.tsx](../src/pages/Fretes.tsx), [src
 - `Dialog` para detalhes e formulários
 
 #### DataTable Genérico
-[src/components/shared/DataTable.tsx](../src/components/shared/DataTable.tsx) - componente reutilizável com:
+`src/components/shared/DataTable.tsx` - componente reutilizável com:
 - Props: `columns`, `data`, `onRowClick`, `highlightNegative`
 - Suporta renderização customizada por coluna via `render()`
 - Destaque automático de linhas negativas (ex: prejuízos)
@@ -60,8 +60,8 @@ const statusConfig = {
 
 ### Dados Demo
 **IMPORTANTE**: Atualmente não há backend. Todos os dados são hardcoded em arrays dentro das páginas:
-- `fretesData` em [src/pages/Fretes.tsx](../src/pages/Fretes.tsx)
-- `caminhoes` em [src/pages/Caminhoes.tsx](../src/pages/Caminhoes.tsx)
+- `fretesData` em `src/pages/Fretes.tsx`
+- `caminhoes` em `src/pages/Caminhoes.tsx`
 - Etc.
 
 Ao criar funcionalidades, mantenha esse padrão até integração com API real.
@@ -85,7 +85,7 @@ import { cn } from "@/lib/utils";
 ```
 
 ### Estilização
-- Use `cn()` de [src/lib/utils.ts](../src/lib/utils.ts) para composição de classes Tailwind
+- Use `cn()` de `src/lib/utils.ts` para composição de classes Tailwind
 - Cores customizadas via CSS variables (theme HSL): `profit`, `loss`, `inTransit`, etc.
 - Classes de animação: `animate-fade-in`, `scrollbar-thin`
 
@@ -114,26 +114,25 @@ npm run lint         # ESLint
 ```
 
 ## Testes
-Configuração em [vitest.config.ts](../vitest.config.ts):
-- Setup global em [src/test/setup.ts](../src/test/setup.ts)
+Configuração em `vitest.config.ts`:
+- Setup global em `src/test/setup.ts`
 - Padrão: `*.test.ts` ou `*.spec.ts` em qualquer lugar de `src/`
 
 ## Extensibilidade
 
 ### Adicionando Nova Página
 1. Criar componente em `src/pages/NomeDaPagina.tsx`
-2. Adicionar rota em [src/App.tsx](../src/App.tsx) dentro de `ProtectedRoute`
-3. Adicionar item no menu em [src/components/layout/AppSidebar.tsx](../src/components/layout/AppSidebar.tsx)
+2. Adicionar rota em `src/App.tsx` dentro de `ProtectedRoute`
+3. Adicionar item no menu em `src/components/layout/AppSidebar.tsx`
 4. Seguir padrão: `MainLayout` → `PageHeader` → `FilterBar` → `DataTable`
 
 ### Adicionando Novo Componente shadcn
 ```bash
 npx shadcn@latest add [component-name]
 ```
-Configuração em [components.json](../components.json).
+Configuração em `components.json`.
 
 ## Observações Importantes
-- Projeto gerado via Lovable.dev - mudanças via IDE local são commitadas automaticamente
 - Não há validação real de permissões por role (apenas autenticação sim/não)
 - Dashboard com dados estáticos de demonstração
 - Mobile-first com hooks: `use-mobile.tsx`
@@ -147,7 +146,22 @@ Estratégia de deploy ainda em análise. Considere ao desenvolver:
 - Configurações de ambiente para futuro backend Node.js + Express
 
 ### Próximos Passos
-1. Integração com backend Node.js + Express (API REST)
-2. Implementação de persistência de dados via banco de dados
-3. Autenticação real com JWT ou sessões
-4. Sistema de permissões granular (admin prioritário)
+1. ✅ Dashboard com KPIs específicos de amendoim implementado
+2. Gestão de Custos Avançada (histórico de preços, análise por rota, previsões)
+3. Rastreamento em Tempo Real (timeline visual, status geográfico, alertas)
+4. Relatórios e Análises (rentabilidade, exportação PDF/Excel)
+5. Gestão de Documentação (CNH, CRLV, notas fiscais)
+6. Melhorias UX/UI (modo escuro, filtros avançados, busca global)
+7. Análise de Dados (tendências, previsão de demanda por safra)
+8. Integração com backend Node.js + Express (API REST)
+9. Implementação de persistência de dados via banco de dados
+10. Autenticação real com JWT ou sessões
+11. Sistema de permissões granular (admin prioritário)
+
+### KPIs Implementados no Dashboard
+- **Sacas Transportadas**: Total mensal com conversão automática para toneladas
+- **Taxa de Ocupação**: Porcentagem de caminhões em uso vs. disponíveis
+- **Custo por Saca**: Média de custo operacional por unidade transportada
+- **Resultado do Mês**: Lucro líquido com tendências vs. mês anterior
+- **Alertas Inteligentes**: Monitoramento de safra, eficiência, custos e performance
+- **Comparativo Mensal**: Janeiro 2025 vs. Dezembro 2024 com cálculos dinâmicos

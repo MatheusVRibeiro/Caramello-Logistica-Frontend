@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, LucideIcon } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -10,21 +10,24 @@ import {
 interface KPICardProps {
   title: string;
   value: string;
-  icon: ReactNode;
+  icon: LucideIcon;
   trend?: {
     value: number;
     isPositive: boolean;
   };
-  variant?: "default" | "profit" | "loss" | "warning";
+  variant?: "default" | "profit" | "loss" | "warning" | "primary" | "active";
   tooltip?: string;
+  onClick?: () => void;
 }
 
-export function KPICard({ title, value, icon, trend, variant = "default", tooltip }: KPICardProps) {
+export function KPICard({ title, value, icon: Icon, trend, variant = "default", tooltip, onClick }: KPICardProps) {
   const variants = {
     default: "bg-card",
     profit: "bg-profit/5 border-profit/20",
     loss: "bg-loss/5 border-loss/20",
     warning: "bg-warning/5 border-warning/20",
+    primary: "bg-primary/5 border-primary/20",
+    active: "bg-active/5 border-active/20",
   };
 
   const iconVariants = {
@@ -32,15 +35,19 @@ export function KPICard({ title, value, icon, trend, variant = "default", toolti
     profit: "bg-profit/10 text-profit",
     loss: "bg-loss/10 text-loss",
     warning: "bg-warning/10 text-warning",
+    primary: "bg-primary/20 text-primary",
+    active: "bg-active/20 text-active",
   };
 
   const cardContent = (
     <div
       className={cn(
         "rounded-xl border p-4 sm:p-6 transition-all hover:shadow-md animate-fade-in",
-        tooltip && "cursor-help",
+        (tooltip || onClick) && "cursor-pointer",
+        onClick && "hover:scale-[1.02] active:scale-[0.98]",
         variants[variant]
       )}
+      onClick={onClick}
     >
       <div className="flex items-start justify-between">
         <div className="space-y-2 min-w-0 flex-1">
@@ -66,7 +73,7 @@ export function KPICard({ title, value, icon, trend, variant = "default", toolti
           )}
         </div>
         <div className={cn("rounded-lg p-2 sm:p-3 flex-shrink-0 ml-2", iconVariants[variant])}>
-          {icon}
+          <Icon className="h-5 w-5" />
         </div>
       </div>
     </div>
