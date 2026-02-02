@@ -815,41 +815,34 @@ export default function Pagamentos() {
 
             <Separator />
 
-            {/* Valor Unitário */}
-            <div className="space-y-2">
-              <Label htmlFor="valorUnitario">Valor por Tonelada (R$) *</Label>
-              <Input
-                id="valorUnitario"
-                type="number"
-                placeholder="150"
-                value={editedPagamento.valorUnitarioPorTonelada || ""}
-                disabled={selectedFretes.length > 0}
-                onChange={(e) => {
-                  const valor = parseFloat(e.target.value) || 0;
-                  const novoTotal = (editedPagamento.toneladas || 0) * valor;
-                  setEditedPagamento({
-                    ...editedPagamento,
-                    valorUnitarioPorTonelada: valor,
-                    valorTotal: novoTotal,
-                  });
-                }}
-              />
-              {selectedFretes.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Valor por tonelada calculado automaticamente com base nos fretes selecionados.
-                </p>
-              )}
-            </div>
+            {/* Resumo de Valores */}
+            {selectedFretes.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Valor por Tonelada (Calculado)</Label>
+                  <Card className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                    <p className="text-2xl font-bold text-blue-600">
+                      R$ {(editedPagamento.valorUnitarioPorTonelada || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Baseado nos fretes selecionados
+                    </p>
+                  </Card>
+                </div>
 
-            {/* Valor Total (Read-only) */}
-            <div className="space-y-2">
-              <Label>Valor Total (Calculado)</Label>
-              <Card className="p-3 bg-profit/5 border-profit/20">
-                <p className="text-2xl font-bold text-profit">
-                  R$ {(editedPagamento.valorTotal || 0).toLocaleString("pt-BR")}
-                </p>
-              </Card>
-            </div>
+                <div className="space-y-2">
+                  <Label>Valor Total a Pagar</Label>
+                  <Card className="p-3 bg-profit/5 border-profit/20">
+                    <p className="text-2xl font-bold text-profit">
+                      R$ {(editedPagamento.valorTotal || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {editedPagamento.toneladas.toFixed(2)}t × R$ {editedPagamento.valorUnitarioPorTonelada.toFixed(2)}/t
+                    </p>
+                  </Card>
+                </div>
+              </div>
+            )}
 
             <Separator />
 

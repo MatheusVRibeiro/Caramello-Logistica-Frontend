@@ -246,6 +246,7 @@ export default function Fretes() {
     caminhaoId: "",
     fazendaId: "",
     toneladas: "",
+    valorPorTonelada: "",
   });
   const [estoquesFazendas, setEstoquesFazendas] = useState<EstoqueFazenda[]>([]);
   const [estoqueSelecionado, setEstoqueSelecionado] = useState<EstoqueFazenda | null>(null);
@@ -265,6 +266,7 @@ export default function Fretes() {
       caminhaoId: "",
       fazendaId: "",
       toneladas: "",
+      valorPorTonelada: "",
     });
     setEstoqueSelecionado(null);
     setIsEditingFrete(false);
@@ -280,6 +282,7 @@ export default function Fretes() {
         caminhaoId: selectedFrete.caminhaoId,
         fazendaId: selectedFrete.fazendaId || "",
         toneladas: selectedFrete.toneladas.toString(),
+        valorPorTonelada: selectedFrete.valorPorTonelada.toString(),
       });
       setIsEditingFrete(true);
       setSelectedFrete(null);
@@ -290,7 +293,7 @@ export default function Fretes() {
   const handleSaveFrete = () => {
     // Validar campos
     if (!newFrete.destino || !newFrete.motoristaId || 
-        !newFrete.caminhaoId || !newFrete.fazendaId || !newFrete.toneladas) {
+        !newFrete.caminhaoId || !newFrete.fazendaId || !newFrete.toneladas || !newFrete.valorPorTonelada) {
       toast.error("Preencha todos os campos!");
       return;
     }
@@ -303,6 +306,12 @@ export default function Fretes() {
     const toneladas = parseFloat(newFrete.toneladas);
     if (isNaN(toneladas) || toneladas <= 0) {
       toast.error("Tonelagem inválida!");
+      return;
+    }
+
+    const valorPorTonelada = parseFloat(newFrete.valorPorTonelada);
+    if (isNaN(valorPorTonelada) || valorPorTonelada <= 0) {
+      toast.error("Valor por tonelada inválido!");
       return;
     }
 
@@ -325,7 +334,7 @@ export default function Fretes() {
     if (!motorista || !caminhao || !custoAbastecimento || !custoMotorista) return;
 
     // Calcular receita
-    const receita = quantidadeSacas * estoqueSelecionado.tarifaPorSaca;
+    const receita = toneladas * valorPorTonelada;
     const distanciaEstimada = 500;
     const combustivelNecess = distanciaEstimada / 5;
     const custoCombustivel = combustivelNecess * custoAbastecimento.custoLitro;
@@ -357,8 +366,8 @@ export default function Fretes() {
         variedade: estoqueSelecionado.variedade,
         dataFrete: new Date().toLocaleDateString("pt-BR"),
         quantidadeSacas: quantidadeSacas,
-        toneladas: (quantidadeSacas * 25) / 1000,
-        valorPorTonelada: estoqueSelecionado.tarifaPorSaca ? (estoqueSelecionado.tarifaPorSaca / 25) * 1000 : 0,
+        toneladas: toneladas,
+        valorPorTonelada: valorPorTonelada,
         receita,
         custos,
         resultado,
@@ -375,6 +384,7 @@ export default function Fretes() {
       caminhaoId: "",
       fazendaId: "",
       toneladas: "",
+      valorPorTonelada: "",
     });
     setEstoqueSelecionado(null);
   };
@@ -1001,8 +1011,30 @@ export default function Fretes() {
                   )}
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="valorTonelada" className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    Valor por Tonelada (R$) *
+                  </Label>
+                  <Input
+                    id="valorTonelada"
+                    type="number"
+                    placeholder="Ex: 1500.00"
+                    step="0.01"
+                    min="0.01"
+                    value={newFrete.valorPorTonelada}
+                    onChange={(e) => setNewFrete({ ...newFrete, valorPorTonelada: e.target.value })}
+                    disabled={!estoqueSelecionado}
+                  />
+                  {estoqueSelecionado && (
+                    <p className="text-xs text-muted-foreground">
+                      Valor sugerido da mercadoria: R$ {((estoqueSelecionado.tarifaPorSaca / estoqueSelecionado.pesoMedioSaca) * 1000).toFixed(2)}/t
+                    </p>
+                  )}
+                </div>
+
                 {/* Preview da Carga */}
-                {estoqueSelecionado && newFrete.toneladas && parseFloat(newFrete.toneladas) > 0 && (
+                {estoqueSelecionado && newFrete.toneladas && parseFloat(newFrete.toneladas) > 0 && newFrete.valorPorTonelada && parseFloat(newFrete.valorPorTonelada) > 0 && (
                   <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex items-center gap-2">
@@ -1025,7 +1057,7 @@ export default function Fretes() {
                         <div>
                           <p className="text-xs text-muted-foreground">Receita Estimada</p>
                           <p className="font-bold text-profit">
-                            R$ {(Math.round((parseFloat(newFrete.toneladas) * 1000) / estoqueSelecionado.pesoMedioSaca) * estoqueSelecionado.tarifaPorSaca).toLocaleString("pt-BR")}
+                            R$ {(parseFloat(newFrete.toneladas) * parseFloat(newFrete.valorPorTonelada)).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
                       </div>
@@ -1048,6 +1080,7 @@ export default function Fretes() {
                   caminhaoId: "",
                   fazendaId: "",
                   toneladas: "",
+                  valorPorTonelada: "",
                 });
                 setEstoqueSelecionado(null);
               }}

@@ -41,17 +41,26 @@ import {
   Zap,
 } from "lucide-react";
 
-interface Viagem {
-  freteId: string;
-  rota: string;
+interface Frete {
+  id: string;
+  origem: string;
+  destino: string;
   motorista: string;
-  dataInicio: string;
-  dataFim: string;
-  receita: number;
-  resultado: number;
+  motoristaId: string;
+  caminhao: string;
+  caminhaoId: string;
   mercadoria: string;
-  quantidade: number;
-  unidade: string;
+  mercadoriaId: string;
+  fazendaId?: string;
+  fazendaNome?: string;
+  variedade?: string;
+  dataFrete: string;
+  quantidadeSacas: number;
+  toneladas: number;
+  valorPorTonelada: number;
+  receita: number;
+  custos: number;
+  resultado: number;
 }
 
 interface Gasto {
@@ -63,12 +72,12 @@ interface Gasto {
 interface RelatorioMotorista {
   motorista: string;
   periodo: string;
-  viagens: Viagem[];
+  fretes: Frete[];
   gastos: Record<string, number>;
   totalGastos: number;
   totalReceita: number;
   totalMercadoria: number;
-  totalViagens: number;
+  totalFretes: number;
   resultado: number;
 }
 
@@ -83,66 +92,111 @@ interface PagamentoRelatorio {
   fretes: string[];
 }
 
-const viagensData: Viagem[] = [
+const fretesData: Frete[] = [
   {
-    freteId: "#1250",
-    rota: "São Paulo → Rio de Janeiro",
+    id: "#1250",
+    origem: "Fazenda Santa Rita - Marília, SP",
+    destino: "Secador Central - Filial 1",
     motorista: "Carlos Silva",
-    dataInicio: "20/01/2025",
-    dataFim: "21/01/2025",
+    motoristaId: "1",
+    caminhao: "ABC-1234",
+    caminhaoId: "1",
+    mercadoria: "Amendoim",
+    mercadoriaId: "1",
+    fazendaId: "1",
+    fazendaNome: "Fazenda Santa Rita",
+    variedade: "Runner IAC 886",
+    dataFrete: "20/01/2025",
+    quantidadeSacas: 600,
+    toneladas: 15,
+    valorPorTonelada: 1000,
     receita: 15000,
-    resultado: 4000,
-    mercadoria: "Amendoim",
-    quantidade: 500,
-    unidade: "sacas",
+    custos: 3200,
+    resultado: 11800,
   },
   {
-    freteId: "#1249",
-    rota: "Curitiba → Florianópolis",
+    id: "#1249",
+    origem: "Fazenda Boa Esperança - Tupã, SP",
+    destino: "Cooperativa Central",
     motorista: "João Oliveira",
-    dataInicio: "18/01/2025",
-    dataFim: "18/01/2025",
-    receita: 8500,
-    resultado: 2300,
-    mercadoria: "Soja",
-    quantidade: 300,
-    unidade: "sacas",
-  },
-  {
-    freteId: "#1248",
-    rota: "Belo Horizonte → Brasília",
-    motorista: "Carlos Silva",
-    dataInicio: "15/01/2025",
-    dataFim: "16/01/2025",
-    receita: 12000,
-    resultado: 3200,
+    motoristaId: "2",
+    caminhao: "DEF-5678",
+    caminhaoId: "2",
     mercadoria: "Amendoim",
-    quantidade: 400,
-    unidade: "sacas",
+    mercadoriaId: "1",
+    fazendaId: "2",
+    fazendaNome: "Fazenda Boa Esperança",
+    variedade: "Runner IAC 886",
+    dataFrete: "18/01/2025",
+    quantidadeSacas: 400,
+    toneladas: 10,
+    valorPorTonelada: 950,
+    receita: 9500,
+    custos: 2100,
+    resultado: 7400,
   },
   {
-    freteId: "#1247",
-    rota: "São Paulo → Rio de Janeiro",
+    id: "#1248",
+    origem: "Fazenda Santa Rita - Marília, SP",
+    destino: "Armazém Regional",
+    motorista: "Carlos Silva",
+    motoristaId: "1",
+    caminhao: "ABC-1234",
+    caminhaoId: "1",
+    mercadoria: "Amendoim",
+    mercadoriaId: "1",
+    fazendaId: "1",
+    fazendaNome: "Fazenda Santa Rita",
+    variedade: "Granoleico",
+    dataFrete: "15/01/2025",
+    quantidadeSacas: 500,
+    toneladas: 12.5,
+    valorPorTonelada: 1100,
+    receita: 13750,
+    custos: 2800,
+    resultado: 10950,
+  },
+  {
+    id: "#1247",
+    origem: "Fazenda Vale Verde - Assis, SP",
+    destino: "Terminal de Grãos",
     motorista: "André Costa",
-    dataInicio: "12/01/2025",
-    dataFim: "13/01/2025",
-    receita: 14000,
-    resultado: -1680,
-    mercadoria: "Milho",
-    quantidade: 450,
-    unidade: "sacas",
+    motoristaId: "3",
+    caminhao: "GHI-9012",
+    caminhaoId: "3",
+    mercadoria: "Amendoim",
+    mercadoriaId: "1",
+    fazendaId: "3",
+    fazendaNome: "Fazenda Vale Verde",
+    variedade: "Runner IAC 886",
+    dataFrete: "12/01/2025",
+    quantidadeSacas: 550,
+    toneladas: 13.75,
+    valorPorTonelada: 980,
+    receita: 13475,
+    custos: 3100,
+    resultado: 10375,
   },
   {
-    freteId: "#1251",
-    rota: "Santos → Campinas",
+    id: "#1251",
+    origem: "Fazenda Boa Esperança - Tupã, SP",
+    destino: "Secador Central - Filial 2",
     motorista: "Carlos Silva",
-    dataInicio: "22/01/2025",
-    dataFim: "22/01/2025",
-    receita: 6500,
-    resultado: 1800,
+    motoristaId: "1",
+    caminhao: "ABC-1234",
+    caminhaoId: "1",
     mercadoria: "Amendoim",
-    quantidade: 250,
-    unidade: "sacas",
+    mercadoriaId: "1",
+    fazendaId: "2",
+    fazendaNome: "Fazenda Boa Esperança",
+    variedade: "Granoleico",
+    dataFrete: "22/01/2025",
+    quantidadeSacas: 350,
+    toneladas: 8.75,
+    valorPorTonelada: 1050,
+    receita: 9187.5,
+    custos: 1900,
+    resultado: 7287.5,
   },
 ];
 
@@ -217,18 +271,18 @@ export default function Relatorios() {
   const hasActiveFilters = dateFrom || dateTo || motorista !== "all";
 
   // Filtrar dados com base nos filtros (se não houver filtros, mostra tudo)
-  const filteredViagens = useMemo(() => {
-    return viagensData.filter((viagem) => {
+  const filteredFretes = useMemo(() => {
+    return fretesData.filter((frete) => {
       // Filtro de motorista
-      if (motorista !== "all" && viagem.motorista !== motorista) return false;
+      if (motorista !== "all" && frete.motorista !== motorista) return false;
       
       // Filtro de data (opcional)
       if (dateFrom || dateTo) {
-        const [dia, mes, ano] = viagem.dataInicio.split("/");
-        const viagemDate = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+        const [dia, mes, ano] = frete.dataFrete.split("/");
+        const freteDate = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
         
-        if (dateFrom && viagemDate < dateFrom) return false;
-        if (dateTo && viagemDate > dateTo) return false;
+        if (dateFrom && freteDate < dateFrom) return false;
+        if (dateTo && freteDate > dateTo) return false;
       }
       
       return true;
@@ -245,12 +299,12 @@ export default function Relatorios() {
       periodo: dateFrom || dateTo 
         ? `${dateFrom ? format(dateFrom, "dd/MM/yyyy") : "Início"} - ${dateTo ? format(dateTo, "dd/MM/yyyy") : "Fim"}`
         : "Todo o período",
-      viagens: filteredViagens,
+      fretes: filteredFretes,
       gastos: {},
       totalGastos: 0,
       totalReceita: 0,
       totalMercadoria: 0,
-      totalViagens: filteredViagens.length,
+      totalFretes: filteredFretes.length,
       resultado: 0,
     };
 
@@ -264,12 +318,12 @@ export default function Relatorios() {
 
     // Calcular totais
     resumo.totalGastos = Object.values(resumo.gastos).reduce((a, b) => a + b, 0);
-    resumo.totalReceita = filteredViagens.reduce((acc, v) => acc + v.receita, 0);
-    resumo.totalMercadoria = filteredViagens.reduce((acc, v) => acc + v.quantidade, 0);
+    resumo.totalReceita = filteredFretes.reduce((acc, f) => acc + f.receita, 0);
+    resumo.totalMercadoria = filteredFretes.reduce((acc, f) => acc + f.quantidadeSacas, 0);
     resumo.resultado = resumo.totalReceita - resumo.totalGastos;
 
     return resumo;
-  }, [motorista, dateFrom, dateTo, filteredViagens]);
+  }, [motorista, dateFrom, dateTo, filteredFretes]);
 
   const filteredPagamentos = useMemo(() => {
     return pagamentosData.filter((pagamento) => {
@@ -368,27 +422,50 @@ export default function Relatorios() {
 
   const columns = [
     {
-      key: "freteId",
+      key: "id",
       header: "ID Frete",
-      render: (item: Viagem) => (
-        <span className="font-mono font-bold">{item.freteId}</span>
+      render: (item: Frete) => (
+        <span className="font-mono font-bold">{item.id}</span>
       ),
     },
-    { key: "rota", header: "Rota" },
-    { key: "mercadoria", header: "Mercadoria" },
+    { 
+      key: "origem", 
+      header: "Origem",
+      render: (item: Frete) => (
+        <div>
+          <p className="font-semibold text-sm">{item.fazendaNome}</p>
+          <p className="text-xs text-muted-foreground">{item.origem}</p>
+        </div>
+      ),
+    },
+    { key: "destino", header: "Destino" },
+    { 
+      key: "mercadoria", 
+      header: "Mercadoria",
+      render: (item: Frete) => (
+        <div>
+          <p className="font-medium">{item.mercadoria}</p>
+          {item.variedade && (
+            <p className="text-xs text-muted-foreground">{item.variedade}</p>
+          )}
+        </div>
+      ),
+    },
     {
       key: "quantidade",
       header: "Quantidade",
-      render: (item: Viagem) => (
-        <span>{item.quantidade} {item.unidade}</span>
+      render: (item: Frete) => (
+        <div>
+          <p className="font-semibold">{item.quantidadeSacas} sacas</p>
+          <p className="text-xs text-muted-foreground">{item.toneladas.toFixed(2)}t</p>
+        </div>
       ),
     },
-    { key: "dataInicio", header: "Saída" },
-    { key: "dataFim", header: "Chegada" },
+    { key: "dataFrete", header: "Data" },
     {
       key: "receita",
       header: "Receita",
-      render: (item: Viagem) => (
+      render: (item: Frete) => (
         <span className="font-medium text-profit">
           R$ {item.receita.toLocaleString("pt-BR")}
         </span>
@@ -397,7 +474,7 @@ export default function Relatorios() {
     {
       key: "resultado",
       header: "Resultado",
-      render: (item: Viagem) => (
+      render: (item: Frete) => (
         <Badge variant={item.resultado >= 0 ? "profit" : "loss"}>
           {item.resultado >= 0 ? "+" : ""}R${" "}
           {(item.resultado / 1000).toFixed(1)}k
@@ -408,10 +485,12 @@ export default function Relatorios() {
 
   return (
     <MainLayout title="Relatórios" subtitle="Análise detalhada por motorista">
-      <PageHeader
-        title="Relatórios Inteligentes"
-        description="Acompanhe viagens, custos e desempenho com precisão"
-        actions={
+      <div className="space-y-4 mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Relatórios Inteligentes</h1>
+            <p className="text-muted-foreground mt-1">Acompanhe fretes, custos e desempenho com precisão</p>
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" className="gap-2">
               <FileSpreadsheet className="h-4 w-4" />
@@ -422,8 +501,22 @@ export default function Relatorios() {
               PDF
             </Button>
           </div>
-        }
-      />
+        </div>
+        
+        {motorista !== "all" && (
+          <Card className="p-4 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-l-4 border-l-blue-500">
+            <div className="flex items-center gap-3">
+              <div className="bg-blue-500/20 p-2 rounded-lg">
+                <Truck className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Motorista Selecionado</p>
+                <p className="text-lg font-bold text-blue-600">{motorista}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* Filters - Improved Design */}
       <div className="mb-8 p-6 bg-gradient-to-r from-card to-card/50 rounded-xl border shadow-sm">
@@ -563,7 +656,7 @@ export default function Relatorios() {
             )}
           >
             <Truck className="h-5 w-5" />
-            <span className="font-semibold">Viagens</span>
+            <span className="font-semibold">Fretes</span>
           </TabsTrigger>
           
           <TabsTrigger 
@@ -623,15 +716,15 @@ export default function Relatorios() {
           </div>
           {/* KPI Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Viagens */}
+            {/* Fretes */}
             <Card 
               onClick={() => setActiveTab("viagens")}
               className="p-6 hover:shadow-lg transition-all duration-300 border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50/50 to-transparent dark:from-blue-950/20 cursor-pointer hover:scale-105 hover:bg-blue-100/50 dark:hover:bg-blue-950/40"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Total de Viagens</p>
-                  <p className="text-4xl font-bold text-blue-600">{relatorioMotorista.totalViagens}</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Total de Fretes</p>
+                  <p className="text-4xl font-bold text-blue-600">{relatorioMotorista.totalFretes}</p>
                   <p className="text-xs text-muted-foreground mt-2">Clique para ver detalhes</p>
                 </div>
                 <div className="bg-blue-100 dark:bg-blue-900/40 p-3 rounded-lg">
@@ -795,10 +888,10 @@ export default function Relatorios() {
           </Card>
         </TabsContent>
 
-        {/* TAB: VIAGENS */}
+        {/* TAB: FRETES */}
         <TabsContent value="viagens">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <h3 className="font-semibold text-lg">Relatório de Viagens</h3>
+            <h3 className="font-semibold text-lg">Relatório de Fretes</h3>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="gap-2">
                 <FileSpreadsheet className="h-4 w-4" />
@@ -812,15 +905,15 @@ export default function Relatorios() {
           </div>
           <Card className="p-4">
             <div className="mb-4">
-              <h3 className="font-semibold mb-2">Todas as Viagens</h3>
+              <h3 className="font-semibold mb-2">Todos os Fretes</h3>
               <p className="text-sm text-muted-foreground">
-                Clique em qualquer viagem para ver mais detalhes
+                Clique em qualquer frete para ver mais detalhes
               </p>
             </div>
-            <DataTable<Viagem>
+            <DataTable<Frete>
               columns={columns}
-              data={relatorioMotorista.viagens}
-              emptyMessage="Nenhuma viagem encontrada no período"
+              data={relatorioMotorista.fretes}
+              emptyMessage="Nenhum frete encontrado no período"
             />
           </Card>
         </TabsContent>
@@ -965,9 +1058,12 @@ export default function Relatorios() {
         </TabsContent>
 
         {/* TAB: MERCADORIAS */}
-        <TabsContent value="mercadorias" className="space-y-4">
+        <TabsContent value="mercadorias" className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <h3 className="font-semibold text-lg">Relatório de Cargas</h3>
+            <div>
+              <h3 className="font-semibold text-xl">Relatório de Cargas Transportadas</h3>
+              <p className="text-sm text-muted-foreground mt-1">Análise detalhada de mercadorias e volume</p>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" className="gap-2">
                 <FileSpreadsheet className="h-4 w-4" />
@@ -979,86 +1075,268 @@ export default function Relatorios() {
               </Button>
             </div>
           </div>
-          {/* Resumo de Mercadoria */}
-          <Card className="p-6 bg-gradient-to-br from-primary/5 to-transparent border-2 border-primary/20">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-2">Total Carregado</p>
-                <p className="text-5xl font-bold text-primary mb-2">
-                  {relatorioMotorista.totalMercadoria}
-                </p>
-                <p className="text-lg text-muted-foreground">sacas</p>
-                <p className="text-sm text-muted-foreground mt-3">
-                  ≈ <span className="font-semibold">{(relatorioMotorista.totalMercadoria * 60 / 1000).toFixed(2)} toneladas</span>
-                </p>
-              </div>
-              <div className="bg-primary/10 p-4 rounded-xl">
-                <Package className="h-10 w-10 text-primary" />
-              </div>
-            </div>
-          </Card>
 
-          {/* Média por viagem */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="p-4 border-l-4 border-l-blue-500">
-              <p className="text-sm text-muted-foreground mb-2">Média por Viagem</p>
-              <p className="text-3xl font-bold text-blue-600">
-                {relatorioMotorista.totalViagens > 0
-                  ? (relatorioMotorista.totalMercadoria / relatorioMotorista.totalViagens).toFixed(0)
-                  : 0}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">sacas/viagem</p>
+          {/* KPIs Principais */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Total Carregado */}
+            <Card className="p-6 bg-gradient-to-br from-green-50/80 to-green-100/30 dark:from-green-950/30 dark:to-green-900/10 border-2 border-green-200 dark:border-green-900">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Volume Total</p>
+                  <p className="text-4xl font-bold text-green-600 mb-1">
+                    {relatorioMotorista.totalMercadoria.toLocaleString("pt-BR")}
+                  </p>
+                  <p className="text-sm text-green-700 font-semibold">sacas</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ≈ <span className="font-bold">{(relatorioMotorista.totalMercadoria * 60 / 1000).toFixed(2)}</span> toneladas
+                  </p>
+                </div>
+                <div className="bg-green-500/10 p-3 rounded-xl">
+                  <Package className="h-8 w-8 text-green-600" />
+                </div>
+              </div>
             </Card>
 
-            <Card className="p-4 border-l-4 border-l-green-500">
-              <p className="text-sm text-muted-foreground mb-2">Maior Carregamento</p>
-              <p className="text-3xl font-bold text-green-600">
-                {Math.max(...relatorioMotorista.viagens.map(v => v.quantidade))}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">sacas</p>
+            {/* Média por Frete */}
+            <Card className="p-6 bg-gradient-to-br from-blue-50/80 to-blue-100/30 dark:from-blue-950/30 dark:to-blue-900/10 border-2 border-blue-200 dark:border-blue-900">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Média por Frete</p>
+                  <p className="text-4xl font-bold text-blue-600 mb-1">
+                    {relatorioMotorista.totalFretes > 0
+                      ? (relatorioMotorista.totalMercadoria / relatorioMotorista.totalFretes).toFixed(0)
+                      : 0}
+                  </p>
+                  <p className="text-sm text-blue-700 font-semibold">sacas/frete</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ≈ <span className="font-bold">{relatorioMotorista.totalFretes > 0 ? ((relatorioMotorista.totalMercadoria / relatorioMotorista.totalFretes) * 60 / 1000).toFixed(2) : 0}</span> ton/frete
+                  </p>
+                </div>
+                <div className="bg-blue-500/10 p-3 rounded-xl">
+                  <TrendingUp className="h-8 w-8 text-blue-600" />
+                </div>
+              </div>
             </Card>
 
-            <Card className="p-4 border-l-4 border-l-purple-500">
-              <p className="text-sm text-muted-foreground mb-2">Menor Carregamento</p>
-              <p className="text-3xl font-bold text-purple-600">
-                {Math.min(...relatorioMotorista.viagens.map(v => v.quantidade))}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">sacas</p>
+            {/* Maior Carga */}
+            <Card className="p-6 bg-gradient-to-br from-purple-50/80 to-purple-100/30 dark:from-purple-950/30 dark:to-purple-900/10 border-2 border-purple-200 dark:border-purple-900">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Maior Carga</p>
+                  <p className="text-4xl font-bold text-purple-600 mb-1">
+                    {relatorioMotorista.fretes.length > 0 ? Math.max(...relatorioMotorista.fretes.map(f => f.quantidadeSacas)) : 0}
+                  </p>
+                  <p className="text-sm text-purple-700 font-semibold">sacas</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ≈ <span className="font-bold">{relatorioMotorista.fretes.length > 0 ? Math.max(...relatorioMotorista.fretes.map(f => f.toneladas)).toFixed(2) : 0}</span> toneladas
+                  </p>
+                </div>
+                <div className="bg-purple-500/10 p-3 rounded-xl">
+                  <CheckCircle2 className="h-8 w-8 text-purple-600" />
+                </div>
+              </div>
+            </Card>
+
+            {/* Menor Carga */}
+            <Card className="p-6 bg-gradient-to-br from-orange-50/80 to-orange-100/30 dark:from-orange-950/30 dark:to-orange-900/10 border-2 border-orange-200 dark:border-orange-900">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Menor Carga</p>
+                  <p className="text-4xl font-bold text-orange-600 mb-1">
+                    {relatorioMotorista.fretes.length > 0 ? Math.min(...relatorioMotorista.fretes.map(f => f.quantidadeSacas)) : 0}
+                  </p>
+                  <p className="text-sm text-orange-700 font-semibold">sacas</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ≈ <span className="font-bold">{relatorioMotorista.fretes.length > 0 ? Math.min(...relatorioMotorista.fretes.map(f => f.toneladas)).toFixed(2) : 0}</span> toneladas
+                  </p>
+                </div>
+                <div className="bg-orange-500/10 p-3 rounded-xl">
+                  <AlertCircle className="h-8 w-8 text-orange-600" />
+                </div>
+              </div>
             </Card>
           </div>
 
-          {/* Breakdown por Mercadoria */}
+          {/* Análise por Tipo de Mercadoria */}
           <Card className="p-6">
-            <h3 className="font-semibold text-lg mb-4">Detalhamento por Frete</h3>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="font-semibold text-lg">Distribuição por Tipo de Mercadoria</h3>
+                <p className="text-sm text-muted-foreground">Breakdown detalhado por produto</p>
+              </div>
+            </div>
+            
+            {(() => {
+              const mercadoriaStats = relatorioMotorista.fretes.reduce((acc, f) => {
+                if (!acc[f.mercadoria]) {
+                  acc[f.mercadoria] = { quantidade: 0, fretes: 0, receita: 0, toneladas: 0 };
+                }
+                acc[f.mercadoria].quantidade += f.quantidadeSacas;
+                acc[f.mercadoria].toneladas += f.toneladas;
+                acc[f.mercadoria].fretes += 1;
+                acc[f.mercadoria].receita += f.receita;
+                return acc;
+              }, {} as Record<string, { quantidade: number; fretes: number; receita: number; toneladas: number }>);
+
+              const totalQtd = Object.values(mercadoriaStats).reduce((acc, m) => acc + m.quantidade, 0);
+
+              return (
+                <div className="space-y-4">
+                  {Object.entries(mercadoriaStats).map(([mercadoria, stats], idx) => {
+                    const percentual = (stats.quantidade / totalQtd) * 100;
+                    const colors = ["blue", "green", "purple", "orange", "pink"];
+                    const color = colors[idx % colors.length];
+                    
+                    return (
+                      <div key={mercadoria} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-3 h-3 rounded-full bg-${color}-500`}></div>
+                            <div>
+                              <p className="font-semibold text-foreground">{mercadoria}</p>
+                              <p className="text-xs text-muted-foreground">{stats.fretes} {stats.fretes === 1 ? 'frete' : 'fretes'}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-foreground">{stats.quantidade.toLocaleString("pt-BR")} sacas</p>
+                            <p className="text-xs text-muted-foreground">{stats.toneladas.toFixed(2)} ton • {percentual.toFixed(1)}%</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Progress value={percentual} className={`flex-1 h-3 bg-${color}-100`} />
+                          <span className="text-sm font-semibold text-muted-foreground min-w-[50px] text-right">
+                            {percentual.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="pl-6 grid grid-cols-2 gap-4 text-xs text-muted-foreground">
+                          <div>
+                            <span className="font-semibold">Receita:</span> R$ {stats.receita.toLocaleString("pt-BR")}
+                          </div>
+                          <div>
+                            <span className="font-semibold">Média/frete:</span> {(stats.quantidade / stats.fretes).toFixed(0)} sacas
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {Object.keys(mercadoriaStats).length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                      <p>Nenhuma carga registrada no período selecionado</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </Card>
+
+          {/* Detalhamento de Cargas por Frete */}
+          <Card className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-semibold text-lg">Detalhamento por Frete</h3>
+                <p className="text-sm text-muted-foreground">Todas as cargas transportadas no período</p>
+              </div>
+              <Badge variant="outline" className="bg-primary/5">
+                {relatorioMotorista.fretes.length} {relatorioMotorista.fretes.length === 1 ? 'frete' : 'fretes'}
+              </Badge>
+            </div>
+            
             <div className="space-y-2">
-              {relatorioMotorista.viagens.length > 0 ? (
-                relatorioMotorista.viagens.map((viagem, idx) => (
+              {relatorioMotorista.fretes.length > 0 ? (
+                relatorioMotorista.fretes.map((frete, idx) => (
                   <div
-                    key={viagem.freteId}
-                    className="flex items-center justify-between p-3 bg-muted/40 hover:bg-muted/60 rounded-lg transition-colors group"
+                    key={frete.id}
+                    className="flex items-center justify-between p-4 bg-gradient-to-r from-muted/40 to-transparent hover:from-muted/60 hover:to-muted/20 rounded-lg transition-all group border border-transparent hover:border-primary/20"
                   >
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="bg-primary/10 px-3 py-1 rounded text-sm font-mono font-semibold text-primary">
-                        #{idx + 1}
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="bg-primary/10 group-hover:bg-primary/20 transition-colors px-3 py-2 rounded-lg">
+                        <span className="text-lg font-bold text-primary">#{idx + 1}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">{viagem.mercadoria}</p>
-                        <p className="text-xs text-muted-foreground">{viagem.rota}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-bold text-foreground">{frete.mercadoria}</p>
+                          <Badge variant="outline" className="text-xs">{frete.id}</Badge>
+                          {frete.variedade && (
+                            <Badge variant="secondary" className="text-xs">{frete.variedade}</Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {frete.fazendaNome} → {frete.destino}
+                        </p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-muted-foreground">{frete.dataFrete}</span>
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <span className="text-xs text-muted-foreground">{frete.motorista}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-foreground">{viagem.quantidade} sacas</p>
-                      <p className="text-xs text-muted-foreground">
-                        {(viagem.quantidade * 60 / 1000).toFixed(2)} ton
+                    <div className="text-right space-y-1">
+                      <p className="text-2xl font-bold text-green-600">{frete.quantidadeSacas}</p>
+                      <p className="text-xs text-muted-foreground">sacas</p>
+                      <p className="text-xs text-foreground font-semibold">
+                        {frete.toneladas.toFixed(2)} ton
+                      </p>
+                      <p className="text-xs text-profit font-semibold">
+                        R$ {frete.receita.toLocaleString("pt-BR")}
                       </p>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-center text-muted-foreground py-4">Nenhuma viagem registrada</p>
+                <div className="text-center py-12 text-muted-foreground">
+                  <Truck className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                  <p className="text-lg font-semibold mb-1">Nenhum frete registrado</p>
+                  <p className="text-sm">Selecione um período ou motorista para visualizar os dados</p>
+                </div>
               )}
             </div>
           </Card>
+
+          {/* Indicadores de Performance */}
+          {relatorioMotorista.fretes.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="p-4 bg-gradient-to-br from-emerald-50/50 to-transparent border-l-4 border-l-emerald-500">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-lg">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Taxa de Utilização</p>
+                </div>
+                <p className="text-3xl font-bold text-emerald-600">
+                  {((relatorioMotorista.totalMercadoria / (relatorioMotorista.totalFretes * 600)) * 100).toFixed(1)}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Capacidade média aproveitada</p>
+              </Card>
+
+              <Card className="p-4 bg-gradient-to-br from-cyan-50/50 to-transparent border-l-4 border-l-cyan-500">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="bg-cyan-100 dark:bg-cyan-900/30 p-2 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-cyan-600" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Receita por Saca</p>
+                </div>
+                <p className="text-3xl font-bold text-cyan-600">
+                  R$ {relatorioMotorista.totalMercadoria > 0 ? (relatorioMotorista.totalReceita / relatorioMotorista.totalMercadoria).toFixed(2) : "0.00"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Valor médio unitário</p>
+              </Card>
+
+              <Card className="p-4 bg-gradient-to-br from-indigo-50/50 to-transparent border-l-4 border-l-indigo-500">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg">
+                    <Truck className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Eficiência Logística</p>
+                </div>
+                <p className="text-3xl font-bold text-indigo-600">
+                  {relatorioMotorista.totalFretes > 0 ? ((relatorioMotorista.totalReceita / relatorioMotorista.totalFretes) / 1000).toFixed(1) : "0.0"}k
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">Receita por frete</p>
+              </Card>
+            </div>
+          )}
         </TabsContent>
 
         {/* TAB: PAGAMENTOS */}
