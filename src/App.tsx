@@ -14,6 +14,7 @@ import Mercadorias from "./pages/Mercadorias";
 import Custos from "./pages/Custos";
 import Relatorios from "./pages/Relatorios";
 import Indicadores from "./pages/Indicadores";
+import Pagamentos from "./pages/Pagamentos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -91,6 +92,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Indicadores />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pagamentos"
+              element={
+                <ProtectedRoute>
+                  <Pagamentos />
                 </ProtectedRoute>
               }
             />

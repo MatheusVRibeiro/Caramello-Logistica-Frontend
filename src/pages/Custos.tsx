@@ -6,8 +6,10 @@ import { DataTable } from "@/components/shared/DataTable";
 import { StatCard } from "@/components/shared/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -22,7 +24,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Upload, Fuel, Wrench, FileText, DollarSign, Truck } from "lucide-react";
+import { Plus, Upload, Fuel, Wrench, FileText, DollarSign, Truck, User, MapPin, Calendar as CalendarIcon, FileCheck, Eye, Filter, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Custo {
   id: string;
@@ -32,6 +43,10 @@ interface Custo {
   valor: number;
   data: string;
   comprovante: boolean;
+  motorista: string;
+  caminhao: string;
+  rota: string;
+  observacoes?: string;
 }
 
 const custosData: Custo[] = [
@@ -43,6 +58,10 @@ const custosData: Custo[] = [
     valor: 2500,
     data: "20/01/2025",
     comprovante: true,
+    motorista: "Carlos Silva",
+    caminhao: "ABC-1234",
+    rota: "São Paulo → Rio de Janeiro",
+    observacoes: "Posto Shell - Rodovia Presidente Dutra KM 180",
   },
   {
     id: "2",
@@ -52,6 +71,10 @@ const custosData: Custo[] = [
     valor: 850,
     data: "20/01/2025",
     comprovante: true,
+    motorista: "Carlos Silva",
+    caminhao: "ABC-1234",
+    rota: "São Paulo → Rio de Janeiro",
+    observacoes: "9 praças de pedágio no trajeto",
   },
   {
     id: "3",
@@ -61,6 +84,10 @@ const custosData: Custo[] = [
     valor: 3200,
     data: "18/01/2025",
     comprovante: true,
+    motorista: "João Oliveira",
+    caminhao: "XYZ-5678",
+    rota: "Curitiba → Florianópolis",
+    observacoes: "Borracharia São José - 2 pneus Pirelli novos",
   },
   {
     id: "4",
@@ -70,6 +97,9 @@ const custosData: Custo[] = [
     valor: 1800,
     data: "17/01/2025",
     comprovante: false,
+    motorista: "João Oliveira",
+    caminhao: "XYZ-5678",
+    rota: "Curitiba → Florianópolis",
   },
   {
     id: "5",
@@ -79,6 +109,10 @@ const custosData: Custo[] = [
     valor: 150,
     data: "15/01/2025",
     comprovante: true,
+    motorista: "André Costa",
+    caminhao: "DEF-9012",
+    rota: "São Paulo → Rio de Janeiro",
+    observacoes: "Estacionamento durante pernoite - 24h",
   },
 ];
 
@@ -92,14 +126,71 @@ const tipoConfig = {
 export default function Custos() {
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("all");
+  const [motoristaFilter, setMotoristaFilter] = useState<string>("all");
+  const [comprovanteFilter, setComprovanteFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<Date>();
+  const [dateTo, setDateTo] = useState<Date>();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCusto, setSelectedCusto] = useState<Custo | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  const handleRowClick = (custo: Custo) => {
+    setSelectedCusto(custo);
+    setIsDetailsOpen(true);
+  };
+
+  // Limpar todos os filtros
+  const clearFilters = () => {
+    setSearch("");
+    setTipoFilter("all");
+    setMotoristaFilter("all");
+    setComprovanteFilter("all");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
+
+  // Verificar se há filtros ativos
+  const hasActiveFilters = 
+    search !== "" || 
+    tipoFilter !== "all" || 
+    motoristaFilter !== "all" || 
+    comprovanteFilter !== "all" ||
+    dateFrom !== undefined || 
+    dateTo !== undefined;
+
+  // Lista única de motoristas
+  const motoristas = Array.from(new Set(custosData.map(c => c.motorista)));
 
   const filteredData = custosData.filter((custo) => {
+    // Filtro de busca
     const matchesSearch =
       custo.freteId.toLowerCase().includes(search.toLowerCase()) ||
-      custo.descricao.toLowerCase().includes(search.toLowerCase());
+      custo.descricao.toLowerCase().includes(search.toLowerCase()) ||
+      custo.motorista.toLowerCase().includes(search.toLowerCase());
+    
+    // Filtro de tipo
     const matchesTipo = tipoFilter === "all" || custo.tipo === tipoFilter;
-    return matchesSearch && matchesTipo;
+    
+    // Filtro de motorista
+    const matchesMotorista = motoristaFilter === "all" || custo.motorista === motoristaFilter;
+    
+    // Filtro de comprovante
+    const matchesComprovante = 
+      comprovanteFilter === "all" || 
+      (comprovanteFilter === "com" && custo.comprovante) ||
+      (comprovanteFilter === "sem" && !custo.comprovante);
+    
+    // Filtro de data
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const [dia, mes, ano] = custo.data.split("/");
+      const custoDate = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
+      
+      if (dateFrom && custoDate < dateFrom) matchesDate = false;
+      if (dateTo && custoDate > dateTo) matchesDate = false;
+    }
+    
+    return matchesSearch && matchesTipo && matchesMotorista && matchesComprovante && matchesDate;
   });
 
   const totalCustos = custosData.reduce((acc, c) => acc + c.valor, 0);
@@ -122,10 +213,10 @@ export default function Custos() {
         const Icon = config.icon;
         return (
           <div className="flex items-center gap-2">
-            <div className={`p-2 rounded-lg bg-muted ${config.color}`}>
+            <div className={cn("p-2 rounded-lg bg-muted", config.color)}>
               <Icon className="h-4 w-4" />
             </div>
-            <span>{config.label}</span>
+            <span className="font-medium">{config.label}</span>
           </div>
         );
       },
@@ -134,15 +225,24 @@ export default function Custos() {
       key: "freteId",
       header: "Frete",
       render: (item: Custo) => (
-        <span className="font-mono text-primary">{item.freteId}</span>
+        <span className="font-mono font-bold text-primary">{item.freteId}</span>
       ),
     },
-    { key: "descricao", header: "Descrição" },
+    { 
+      key: "descricao", 
+      header: "Descrição",
+      render: (item: Custo) => (
+        <div>
+          <p className="font-medium">{item.descricao}</p>
+          <p className="text-xs text-muted-foreground">{item.motorista}</p>
+        </div>
+      ),
+    },
     {
       key: "valor",
       header: "Valor",
       render: (item: Custo) => (
-        <span className="font-semibold text-loss">
+        <span className="font-bold text-lg text-loss">
           R$ {item.valor.toLocaleString("pt-BR")}
         </span>
       ),
@@ -159,8 +259,26 @@ export default function Custos() {
       header: "Comprovante",
       render: (item: Custo) => (
         <Badge variant={item.comprovante ? "success" : "neutral"}>
-          {item.comprovante ? "Anexado" : "Pendente"}
+          {item.comprovante ? "✓ Anexado" : "Pendente"}
         </Badge>
+      ),
+    },
+    {
+      key: "actions",
+      header: "",
+      render: (item: Custo) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleRowClick(item);
+          }}
+          className="gap-2"
+        >
+          <Eye className="h-4 w-4" />
+          Ver
+        </Button>
       ),
     },
   ];
@@ -206,30 +324,274 @@ export default function Custos() {
         />
       </div>
 
-      <FilterBar
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder="Buscar por frete ou descrição..."
-      >
-        <Select value={tipoFilter} onValueChange={setTipoFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="combustivel">Combustível</SelectItem>
-            <SelectItem value="manutencao">Manutenção</SelectItem>
-            <SelectItem value="pedagio">Pedágio</SelectItem>
-            <SelectItem value="outros">Outros</SelectItem>
-          </SelectContent>
-        </Select>
-      </FilterBar>
+      {/* Filters Section */}
+      <Card className="p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Filter className="h-5 w-5 text-muted-foreground" />
+            <h3 className="font-semibold">Filtros</h3>
+            {hasActiveFilters && (
+              <Badge variant="default" className="bg-primary/20 text-primary hover:bg-primary/30">
+                {filteredData.length} resultado{filteredData.length !== 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+
+        {/* Filter Inputs */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          {/* Busca */}
+          <div className="lg:col-span-2">
+            <Label className="text-xs text-muted-foreground mb-2 block">Buscar</Label>
+            <Input
+              placeholder="Frete, descrição ou motorista..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          {/* Tipo */}
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Tipo</Label>
+            <Select value={tipoFilter} onValueChange={setTipoFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                <SelectItem value="combustivel">🛢️ Combustível</SelectItem>
+                <SelectItem value="manutencao">🔧 Manutenção</SelectItem>
+                <SelectItem value="pedagio">🛣️ Pedágio</SelectItem>
+                <SelectItem value="outros">📄 Outros</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Motorista */}
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Motorista</Label>
+            <Select value={motoristaFilter} onValueChange={setMotoristaFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos motoristas</SelectItem>
+                {motoristas.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Comprovante */}
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Comprovante</Label>
+            <Select value={comprovanteFilter} onValueChange={setComprovanteFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="com">✓ Com comprovante</SelectItem>
+                <SelectItem value="sem">✗ Sem comprovante</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Data Período */}
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Período</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !dateFrom && !dateTo && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateFrom || dateTo
+                    ? `${dateFrom ? format(dateFrom, "dd/MM") : "..."} - ${dateTo ? format(dateTo, "dd/MM") : "..."}`
+                    : "Selecione"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <div className="p-3 space-y-3">
+                  <div>
+                    <Label className="text-xs mb-1 block">De</Label>
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={setDateFrom}
+                      className="pointer-events-auto"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs mb-1 block">Até</Label>
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={setDateTo}
+                      className="pointer-events-auto"
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+      </Card>
 
       <DataTable<Custo>
         columns={columns}
         data={filteredData}
+        onRowClick={handleRowClick}
         emptyMessage="Nenhum custo encontrado"
       />
+
+      {/* Details Modal */}
+      {selectedCusto && (
+        <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl">
+                {(() => {
+                  const config = tipoConfig[selectedCusto.tipo];
+                  const Icon = config.icon;
+                  return (
+                    <>
+                      <div className={cn("p-2 rounded-lg bg-muted", config.color)}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      Detalhes do Custo
+                    </>
+                  );
+                })()}
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              {/* Header Info */}
+              <Card className="p-4 bg-gradient-to-br from-muted/50 to-transparent">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      {tipoConfig[selectedCusto.tipo].label}
+                    </p>
+                    <p className="text-3xl font-bold text-loss">
+                      R$ {selectedCusto.valor.toLocaleString("pt-BR")}
+                    </p>
+                  </div>
+                  <Badge 
+                    variant={selectedCusto.comprovante ? "success" : "neutral"}
+                    className="text-sm px-3 py-1"
+                  >
+                    {selectedCusto.comprovante ? (
+                      <><FileCheck className="h-4 w-4 mr-1 inline" /> Comprovante Anexado</>
+                    ) : (
+                      "Sem Comprovante"
+                    )}
+                  </Badge>
+                </div>
+              </Card>
+
+              <Separator />
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Frete */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                    <span>Frete</span>
+                  </div>
+                  <p className="font-mono font-bold text-primary text-lg">
+                    {selectedCusto.freteId}
+                  </p>
+                </div>
+
+                {/* Data */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarIcon className="h-4 w-4" />
+                    <span>Data</span>
+                  </div>
+                  <p className="font-semibold text-lg">{selectedCusto.data}</p>
+                </div>
+
+                {/* Motorista */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="h-4 w-4" />
+                    <span>Motorista</span>
+                  </div>
+                  <p className="font-semibold text-lg">{selectedCusto.motorista}</p>
+                </div>
+
+                {/* Caminhão */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Truck className="h-4 w-4" />
+                    <span>Caminhão</span>
+                  </div>
+                  <p className="font-mono font-bold text-lg">{selectedCusto.caminhao}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Rota */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-4 w-4" />
+                  <span>Rota</span>
+                </div>
+                <p className="font-semibold text-lg">{selectedCusto.rota}</p>
+              </div>
+
+              {/* Descrição */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Descrição</p>
+                <Card className="p-4 bg-muted/30">
+                  <p className="text-foreground">{selectedCusto.descricao}</p>
+                </Card>
+              </div>
+
+              {/* Observações */}
+              {selectedCusto.observacoes && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">Observações</p>
+                  <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                    <p className="text-foreground">{selectedCusto.observacoes}</p>
+                  </Card>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
+                Fechar
+              </Button>
+              <Button variant="default">
+                <Upload className="h-4 w-4 mr-2" />
+                Anexar Comprovante
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* New Cost Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

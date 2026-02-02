@@ -40,14 +40,14 @@ export function DataTable<T>({
   }
 
   return (
-    <div className="bg-card rounded-xl border overflow-hidden animate-fade-in">
+    <div className="bg-card rounded-xl border overflow-hidden animate-fade-in shadow-sm">
       <Table>
         <TableHeader>
-          <TableRow className="bg-muted/50 hover:bg-muted/50">
+          <TableRow className="bg-gradient-to-r from-muted/50 to-muted/30 hover:bg-muted/50 border-b-2">
             {columns.map((column) => (
               <TableHead
                 key={column.key}
-                className={cn("font-semibold text-foreground", column.className)}
+                className={cn("font-bold text-foreground text-sm uppercase tracking-wide", column.className)}
               >
                 {column.header}
               </TableHead>
@@ -61,14 +61,14 @@ export function DataTable<T>({
               <TableRow
                 key={index}
                 className={cn(
-                  "cursor-pointer transition-colors",
+                  "cursor-pointer transition-all duration-200 border-b hover:border-primary/20",
                   isNegative && "bg-loss/5 hover:bg-loss/10",
-                  !isNegative && "hover:bg-muted/50"
+                  !isNegative && "hover:bg-primary/5 hover:shadow-sm"
                 )}
                 onClick={() => onRowClick?.(item)}
               >
                 {columns.map((column) => (
-                  <TableCell key={column.key} className={column.className}>
+                  <TableCell key={column.key} className={cn("py-3 px-4", column.className)}>
                     {column.render
                       ? column.render(item)
                       : (item as Record<string, unknown>)[column.key] as ReactNode}

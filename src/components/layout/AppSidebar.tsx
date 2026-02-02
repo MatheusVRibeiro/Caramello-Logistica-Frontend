@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Motoristas", href: "/motoristas", icon: Users },
   { name: "Mercadorias", href: "/mercadorias", icon: Package },
   { name: "Custos", href: "/custos", icon: DollarSign },
+  { name: "Pagamentos", href: "/pagamentos", icon: CreditCard },
   { name: "Relatórios", href: "/relatorios", icon: FileText },
   { name: "Indicadores", href: "/indicadores", icon: TrendingUp },
 ];

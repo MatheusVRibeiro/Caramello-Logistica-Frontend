@@ -6,7 +6,11 @@ import { SmartAlerts, SmartAlert } from "@/components/dashboard/SmartAlerts";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { ProfitChart } from "@/components/dashboard/ProfitChart";
 import { DriversRanking } from "@/components/dashboard/DriversRanking";
-import { Package, Truck, DollarSign, TrendingUp } from "lucide-react";
+import { Package, Truck, DollarSign, TrendingUp, MapPin, AlertTriangle, Weight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -29,6 +33,20 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+
+// Interface para EstoqueFazenda
+interface EstoqueFazenda {
+  id: string;
+  fazenda: string;
+  localizacao: string;
+  mercadoria: string;
+  variedade: string;
+  quantidadeSacas: number;
+  quantidadeInicial: number;
+  tarifaPorSaca: number;
+  pesoMedioSaca: number;
+  safra: string;
+}
 
 // Simulação de dados de fretes - em produção virá do backend
 const fretesSimulados = [
@@ -53,46 +71,46 @@ const totalCaminhoes = 5;
 const smartAlerts: SmartAlert[] = [
   {
     id: "1",
-    type: "warning",
+    type: "info",
     icon: "margin",
-    title: "Safra do Amendoim - Alta Temporada",
-    description: "Período de colheita iniciando. Aumento de demanda previsto em 35% para os próximos 30 dias.",
+    title: "Estoques de Fazendas - Monitoramento Ativo",
+    description: "2.1 milhões de sacas disponíveis em 4 fazendas ativas. Acompanhamento em tempo real.",
     action: {
-      label: "Ver previsões",
-      onClick: () => toast.info("Preparando relatório de previsão de demanda"),
+      label: "Ver detalhes",
+      onClick: () => toast.info("Navegando para gestão de mercadorias"),
     },
   },
   {
     id: "2",
-    type: "info",
-    icon: "truck",
-    title: "Eficiência da Frota",
-    description: "Taxa de ocupação em 40% - 3 caminhões disponíveis para novos fretes.",
+    type: "danger",
+    icon: "cost",
+    title: "⚠️ Fazenda Recanto - Estoque Esgotado",
+    description: "Estoque zerado. Aguardando reposição da próxima colheita.",
     action: {
-      label: "Ver frota",
-      onClick: () => toast.info("Navegando para gestão de caminhões"),
+      label: "Conferir",
+      onClick: () => toast.error("Estoque crítico - ação necessária"),
     },
   },
   {
     id: "3",
-    type: "danger",
-    icon: "cost",
-    title: "Custo por Saca Elevado",
-    description: "Custo médio subiu para R$ 3,85/saca. Considere otimização de rotas e revisão de custos.",
+    type: "warning",
+    icon: "truck",
+    title: "Fazenda São João - Estoque Crítico",
+    description: "Apenas 180k sacas restantes (60% consumido). Estoque baixo requer atenção.",
     action: {
-      label: "Analisar custos",
-      onClick: () => toast.info("Abrindo análise detalhada de custos"),
+      label: "Monitorar",
+      onClick: () => toast.warning("Estoque em nível crítico"),
     },
   },
   {
     id: "4",
     type: "info",
     icon: "margin",
-    title: "Top Motorista do Mês",
-    description: "André Costa lidera com R$ 15.690 de lucro acumulado. Margem média de 77%.",
+    title: "Safra 2024/2025 - Em Andamento",
+    description: "Todas as fazendas operando na safra atual. Produção mantendo níveis esperados.",
     action: {
-      label: "Ver ranking",
-      onClick: () => toast.info("Abrindo ranking completo de motoristas"),
+      label: "Histórico",
+      onClick: () => toast.info("Abrindo histórico de safras"),
     },
   },
 ];
@@ -106,19 +124,28 @@ export default function Dashboard() {
     toast.success("Alerta dispensado");
   };
 
-  // Calcular KPIs específicos para logística de amendoim
-  const kpis = useMemo(() => {
+  // Buscar estoques de fazendas
+  const estoquesFazendas = useMemo(() => {
+    const getEstoques = (window as any).getEstoquesFazendas;
+    if (getEstoques) {
+      return getEstoques() as EstoqueFazenda[];
+    }
+    return [] as EstoqueFazenda[];
+  }, []);
+
+  // Calcular KPIs combinados: Fretes + Estoques
+  const kpisIntegrados = useMemo(() => {
     const fretesJaneiro = fretesSimulados.filter(f => f.mes === "jan" && f.status !== "cancelado");
     const fretesDezembro = fretesSimulados.filter(f => f.mes === "dez");
     const fretesAtivos = fretesJaneiro.filter(f => f.status === "em_transito").length;
     
-    // Janeiro
+    // KPIs de Fretes (Janeiro)
     const totalSacasJan = fretesJaneiro.reduce((acc, f) => acc + f.quantidadeSacas, 0);
     const totalReceitaJan = fretesJaneiro.reduce((acc, f) => acc + f.receita, 0);
     const totalCustosJan = fretesJaneiro.reduce((acc, f) => acc + f.custos, 0);
     const totalResultadoJan = totalReceitaJan - totalCustosJan;
     
-    // Dezembro
+    // KPIs de Fretes (Dezembro)
     const totalSacasDez = fretesDezembro.reduce((acc, f) => acc + f.quantidadeSacas, 0);
     const totalReceitaDez = fretesDezembro.reduce((acc, f) => acc + f.receita, 0);
     const totalCustosDez = fretesDezembro.reduce((acc, f) => acc + f.custos, 0);
@@ -133,13 +160,25 @@ export default function Dashboard() {
     const sacasComCustoDez = fretesComCustoDez.reduce((acc, f) => acc + f.quantidadeSacas, 0);
     const custoPorSacaDez = sacasComCustoDez > 0 ? totalCustosDez / sacasComCustoDez : 0;
     
-    // Taxa de ocupação da frota (fretes ativos / total de caminhões)
+    // Taxa de ocupação da frota
     const taxaOcupacao = (fretesAtivos / totalCaminhoes) * 100;
+    
+    // KPIs de Estoques (Fazendas)
+    const totalEstoquesSacas = estoquesFazendas.reduce((acc, e) => acc + e.quantidadeSacas, 0);
+    const totalEstoquesSacasInicial = estoquesFazendas.reduce((acc, e) => acc + e.quantidadeInicial, 0);
+    const totalEstoquesToneladas = (totalEstoquesSacas * 25) / 1000;
+    const totalEstoquesValor = estoquesFazendas.reduce((acc, e) => acc + (e.quantidadeSacas * e.tarifaPorSaca), 0);
+    const fazendaAtivas = estoquesFazendas.filter(e => e.quantidadeSacas > 0).length;
+    const fazendasCriticas = estoquesFazendas.filter(e => {
+      const percentual = (e.quantidadeSacas / e.quantidadeInicial) * 100;
+      return percentual > 0 && percentual <= 20;
+    }).length;
     
     // Calcular trends
     const trendSacas = totalSacasDez > 0 ? ((totalSacasJan - totalSacasDez) / totalSacasDez) * 100 : 0;
     const trendCustoPorSaca = custoPorSacaDez > 0 ? ((custoPorSaca - custoPorSacaDez) / custoPorSacaDez) * 100 : 0;
     const trendResultado = totalResultadoDez > 0 ? ((totalResultadoJan - totalResultadoDez) / totalResultadoDez) * 100 : 0;
+    const trendEstoque = totalEstoquesSacasInicial > 0 ? ((totalEstoquesSacas - totalEstoquesSacasInicial) / totalEstoquesSacasInicial) * 100 : 0;
     
     return {
       janeiro: {
@@ -158,25 +197,43 @@ export default function Dashboard() {
         totalResultado: totalResultadoDez,
         custoPorSaca: custoPorSacaDez,
       },
+      estoques: {
+        totalSacas: totalEstoquesSacas,
+        totalToneladas: totalEstoquesToneladas,
+        totalValor: totalEstoquesValor,
+        fazendaAtivas,
+        fazendasCriticas,
+        percentualConsumido: ((totalEstoquesSacasInicial - totalEstoquesSacas) / totalEstoquesSacasInicial) * 100,
+      },
       trends: {
         sacas: trendSacas,
         custoPorSaca: trendCustoPorSaca,
         resultado: trendResultado,
+        estoque: trendEstoque,
       },
     };
-  }, []);
+  }, [estoquesFazendas]);
 
   const monthlyData = {
     mesAtual: {
-      receita: kpis.janeiro.totalReceita,
-      custos: kpis.janeiro.totalCustos,
-      resultado: kpis.janeiro.totalResultado,
+      receita: kpisIntegrados.janeiro.totalReceita,
+      custos: kpisIntegrados.janeiro.totalCustos,
+      resultado: kpisIntegrados.janeiro.totalResultado,
     },
     mesAnterior: {
-      receita: kpis.dezembro.totalReceita,
-      custos: kpis.dezembro.totalCustos,
-      resultado: kpis.dezembro.totalResultado,
+      receita: kpisIntegrados.dezembro.totalReceita,
+      custos: kpisIntegrados.dezembro.totalCustos,
+      resultado: kpisIntegrados.dezembro.totalResultado,
     },
+  };
+
+  // Função auxiliar para determinar status do estoque
+  const getStatusEstoque = (estoque: EstoqueFazenda) => {
+    const percentual = (estoque.quantidadeSacas / estoque.quantidadeInicial) * 100;
+    if (estoque.quantidadeSacas === 0) return "esgotado";
+    if (percentual <= 20) return "critico";
+    if (percentual <= 50) return "baixo";
+    return "normal";
   };
 
   // Dados para gráfico de sacas transportadas (últimos 6 meses)
@@ -185,8 +242,8 @@ export default function Dashboard() {
     { mes: "Set/24", sacas: 2350, meta: 2500 },
     { mes: "Out/24", sacas: 2200, meta: 2500 },
     { mes: "Nov/24", sacas: 1950, meta: 2500 },
-    { mes: "Dez/24", sacas: kpis.dezembro.totalSacas, meta: 2500 },
-    { mes: "Jan/25", sacas: kpis.janeiro.totalSacas, meta: 2500 },
+    { mes: "Dez/24", sacas: kpisIntegrados.dezembro.totalSacas, meta: 2500 },
+    { mes: "Jan/25", sacas: kpisIntegrados.janeiro.totalSacas, meta: 2500 },
   ];
 
   // Dados para gráfico de taxa de ocupação (últimas 4 semanas)
@@ -194,7 +251,7 @@ export default function Dashboard() {
     { semana: "Semana 1", ocupacao: 80, disponivel: 20 },
     { semana: "Semana 2", ocupacao: 60, disponivel: 40 },
     { semana: "Semana 3", ocupacao: 100, disponivel: 0 },
-    { semana: "Semana 4", ocupacao: kpis.janeiro.taxaOcupacao, disponivel: 100 - kpis.janeiro.taxaOcupacao },
+    { semana: "Semana 4", ocupacao: kpisIntegrados.janeiro.taxaOcupacao, disponivel: 100 - kpisIntegrados.janeiro.taxaOcupacao },
   ];
 
   // Dados para gráfico de custo por saca (últimos 6 meses)
@@ -203,8 +260,8 @@ export default function Dashboard() {
     { mes: "Set/24", custoPorSaca: 3.35, combustivel: 2.20, motorista: 0.95, manutencao: 0.20 },
     { mes: "Out/24", custoPorSaca: 3.50, combustivel: 2.30, motorista: 1.00, manutencao: 0.20 },
     { mes: "Nov/24", custoPorSaca: 3.70, combustivel: 2.50, motorista: 1.00, manutencao: 0.20 },
-    { mes: "Dez/24", custoPorSaca: kpis.dezembro.custoPorSaca, combustivel: 2.60, motorista: 1.05, manutencao: 0.20 },
-    { mes: "Jan/25", custoPorSaca: kpis.janeiro.custoPorSaca, combustivel: 2.70, motorista: 1.00, manutencao: 0.15 },
+    { mes: "Dez/24", custoPorSaca: kpisIntegrados.dezembro.custoPorSaca, combustivel: 2.60, motorista: 1.05, manutencao: 0.20 },
+    { mes: "Jan/25", custoPorSaca: kpisIntegrados.janeiro.custoPorSaca, combustivel: 2.70, motorista: 1.00, manutencao: 0.15 },
   ];
 
   // Dados para gráfico de resultado mensal (últimos 6 meses)
@@ -213,63 +270,149 @@ export default function Dashboard() {
     { mes: "Set/24", receita: 35250, custos: 7875, lucro: 27375 },
     { mes: "Out/24", receita: 33000, custos: 7700, lucro: 25300 },
     { mes: "Nov/24", receita: 29250, custos: 7215, lucro: 22035 },
-    { mes: "Dez/24", receita: kpis.dezembro.totalReceita, custos: kpis.dezembro.totalCustos, lucro: kpis.dezembro.totalResultado },
-    { mes: "Jan/25", receita: kpis.janeiro.totalReceita, custos: kpis.janeiro.totalCustos, lucro: kpis.janeiro.totalResultado },
+    { mes: "Dez/24", receita: kpisIntegrados.dezembro.totalReceita, custos: kpisIntegrados.dezembro.totalCustos, lucro: kpisIntegrados.dezembro.totalResultado },
+    { mes: "Jan/25", receita: kpisIntegrados.janeiro.totalReceita, custos: kpisIntegrados.janeiro.totalCustos, lucro: kpisIntegrados.janeiro.totalResultado },
   ];
 
   return (
     <MainLayout
       title="Dashboard"
-      subtitle="Visão geral das operações de logística de amendoim"
+      subtitle="Visão geral de estoques de fazendas, operações de logística e resultados financeiros"
     >
-      {/* KPI Cards - Específicos para Amendoim */}
+      {/* ===== SEÇÃO 1: ESTOQUES DE FAZENDAS (INFORMAÇÕES PRINCIPAIS) ===== */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <MapPin className="w-6 h-6 text-primary" />
+            Estoques de Fazendas 
+          </h2>
+          <Badge variant="active">
+            {kpisIntegrados.estoques.fazendaAtivas} fazendas ativas
+          </Badge>
+        </div>
+
+
+
+        {/* Resumo de Estoques */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Total Sacas</span>
+                <Package className="w-5 h-5 text-blue-600" />
+              </div>
+              <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                {kpisIntegrados.estoques.totalSacas.toLocaleString("pt-BR")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {kpisIntegrados.estoques.percentualConsumido.toFixed(1)}% consumidas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Total Peso</span>
+                <Weight className="w-5 h-5 text-purple-600" />
+              </div>
+              <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                {kpisIntegrados.estoques.totalToneladas.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} ton
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Peso médio por saca: 25kg
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30">
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Valor Total</span>
+                <DollarSign className="w-5 h-5 text-green-600" />
+              </div>
+              <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                R$ {(kpisIntegrados.estoques.totalValor / 1000000).toFixed(2)}M
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Avaliação de estoque
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className={`bg-gradient-to-br ${
+            kpisIntegrados.estoques.fazendasCriticas > 0
+              ? "from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/30"
+              : "from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30"
+          }`}>
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Alertas</span>
+                <AlertTriangle className={`w-5 h-5 ${
+                  kpisIntegrados.estoques.fazendasCriticas > 0 ? "text-red-600" : "text-green-600"
+                }`} />
+              </div>
+              <p className="text-2xl font-bold">
+                {kpisIntegrados.estoques.fazendasCriticas}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {kpisIntegrados.estoques.fazendasCriticas > 0
+                  ? "fazenda(s) em nível crítico"
+                  : "todos os estoques normais"}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* ===== SEÇÃO 2: KPI CARDS DE FRETES (MANTIDOS) ===== */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <KPICard
           title="Sacas Transportadas"
-          value={`${kpis.janeiro.totalSacas.toLocaleString()} sacas`}
+          value={`${kpisIntegrados.janeiro.totalSacas.toLocaleString()} sacas`}
           icon={Package}
           variant="primary"
           trend={{
-            value: Math.abs(kpis.trends.sacas),
-            isPositive: kpis.trends.sacas >= 0,
+            value: Math.abs(kpisIntegrados.trends.sacas),
+            isPositive: kpisIntegrados.trends.sacas >= 0,
           }}
-          tooltip={`Total de sacas transportadas em Janeiro. Equivale a ~${(kpis.janeiro.totalSacas * 25 / 1000).toFixed(1)} toneladas. Clique para ver detalhes`}
+          tooltip={`Total de sacas transportadas em Janeiro. Equivale a ~${(kpisIntegrados.janeiro.totalSacas * 25 / 1000).toFixed(1)} toneladas. Clique para ver detalhes`}
           onClick={() => setModalAberto("sacas")}
         />
         <KPICard
           title="Taxa de Ocupação"
-          value={`${kpis.janeiro.taxaOcupacao.toFixed(0)}%`}
+          value={`${kpisIntegrados.janeiro.taxaOcupacao.toFixed(0)}%`}
           icon={Truck}
           variant="active"
           trend={{
             value: 5,
             isPositive: true,
           }}
-          tooltip={`${kpis.janeiro.fretesAtivos} de ${totalCaminhoes} caminhões atualmente em uso. ${totalCaminhoes - kpis.janeiro.fretesAtivos} disponíveis. Clique para ver histórico`}
+          tooltip={`${kpisIntegrados.janeiro.fretesAtivos} de ${totalCaminhoes} caminhões atualmente em uso. ${totalCaminhoes - kpisIntegrados.janeiro.fretesAtivos} disponíveis. Clique para ver histórico`}
           onClick={() => setModalAberto("ocupacao")}
         />
         <KPICard
           title="Custo por Saca"
-          value={`R$ ${kpis.janeiro.custoPorSaca.toFixed(2)}`}
+          value={`R$ ${kpisIntegrados.janeiro.custoPorSaca.toFixed(2)}`}
           icon={DollarSign}
           variant="loss"
           trend={{
-            value: Math.abs(kpis.trends.custoPorSaca),
-            isPositive: kpis.trends.custoPorSaca <= 0,
+            value: Math.abs(kpisIntegrados.trends.custoPorSaca),
+            isPositive: kpisIntegrados.trends.custoPorSaca <= 0,
           }}
           tooltip="Custo médio por saca transportada (combustível + motorista + manutenção). Clique para ver breakdown"
           onClick={() => setModalAberto("custos")}
         />
         <KPICard
           title="Resultado do Mês"
-          value={`R$ ${(kpis.janeiro.totalResultado / 1000).toFixed(1)}k`}
+          value={`R$ ${(kpisIntegrados.janeiro.totalResultado / 1000).toFixed(1)}k`}
           icon={TrendingUp}
           variant="profit"
           trend={{
-            value: Math.abs(kpis.trends.resultado),
-            isPositive: kpis.trends.resultado >= 0,
+            value: Math.abs(kpisIntegrados.trends.resultado),
+            isPositive: kpisIntegrados.trends.resultado >= 0,
           }}
-          tooltip={`Receita R$ ${(kpis.janeiro.totalReceita / 1000).toFixed(0)}k - Custos R$ ${(kpis.janeiro.totalCustos / 1000).toFixed(0)}k = Lucro R$ ${(kpis.janeiro.totalResultado / 1000).toFixed(1)}k. Clique para análise detalhada`}
+          tooltip={`Receita R$ ${(kpisIntegrados.janeiro.totalReceita / 1000).toFixed(0)}k - Custos R$ ${(kpisIntegrados.janeiro.totalCustos / 1000).toFixed(0)}k = Lucro R$ ${(kpisIntegrados.janeiro.totalResultado / 1000).toFixed(1)}k. Clique para análise detalhada`}
           onClick={() => setModalAberto("resultado")}
         />
       </div>
@@ -351,9 +494,10 @@ export default function Dashboard() {
             <div className="p-4 bg-muted/50 rounded-lg space-y-2">
               <h4 className="font-semibold">📊 Análise</h4>
               <ul className="text-sm space-y-1 text-muted-foreground">
-                <li>• Janeiro atingiu {((kpis.janeiro.totalSacas / 2500) * 100).toFixed(1)}% da meta mensal</li>
-                <li>• Crescimento de {kpis.trends.sacas.toFixed(1)}% em relação a Dezembro</li>
-                <li>• Equivalente a {(kpis.janeiro.totalSacas * 25 / 1000).toFixed(1)} toneladas transportadas</li>
+                <li>• Janeiro atingiu {((kpisIntegrados.janeiro.totalSacas / 2500) * 100).toFixed(1)}% da meta mensal</li>
+                <li>• Crescimento de {kpisIntegrados.trends.sacas.toFixed(1)}% em relação a Dezembro</li>
+                <li>• Equivalente a {(kpisIntegrados.janeiro.totalSacas * 25 / 1000).toFixed(1)} toneladas transportadas</li>
+                <li>• Estoques de fazendas: {kpisIntegrados.estoques.totalSacas.toLocaleString("pt-BR")} sacas disponíveis</li>
               </ul>
             </div>
           </div>
@@ -375,7 +519,7 @@ export default function Dashboard() {
               <div className="p-4 bg-loss/5 rounded-lg border border-loss/20">
                 <p className="text-sm text-muted-foreground">Custo Atual</p>
                 <p className="text-2xl font-bold text-loss">
-                  R$ {kpis.janeiro.custoPorSaca.toFixed(2)}
+                  R$ {kpisIntegrados.janeiro.custoPorSaca.toFixed(2)}
                 </p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
@@ -445,7 +589,7 @@ export default function Dashboard() {
               <ul className="text-sm space-y-1 text-muted-foreground">
                 <li>• Custo médio dos últimos 6 meses: R$ {(dadosCustoMensal.reduce((acc, d) => acc + d.custoPorSaca, 0) / 6).toFixed(2)}/saca</li>
                 <li>• Combustível representa 70% do custo total - principal fator de variação</li>
-                <li>• Aumento de {kpis.trends.custoPorSaca.toFixed(1)}% em relação a Dezembro</li>
+                <li>• Aumento de {kpisIntegrados.trends.custoPorSaca.toFixed(1)}% em relação a Dezembro</li>
                 <li>• Recomendação: Otimizar rotas para reduzir consumo de combustível</li>
               </ul>
             </div>
@@ -468,19 +612,19 @@ export default function Dashboard() {
               <div className="p-4 bg-active/10 rounded-lg border border-active/20">
                 <p className="text-sm text-muted-foreground">Ocupação Atual</p>
                 <p className="text-2xl font-bold text-active">
-                  {kpis.janeiro.taxaOcupacao.toFixed(0)}%
+                  {kpisIntegrados.janeiro.taxaOcupacao.toFixed(0)}%
                 </p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground">Caminhões Ativos</p>
                 <p className="text-2xl font-bold">
-                  {kpis.janeiro.fretesAtivos} / {totalCaminhoes}
+                  {kpisIntegrados.janeiro.fretesAtivos} / {totalCaminhoes}
                 </p>
               </div>
               <div className="p-4 bg-muted/50 rounded-lg">
                 <p className="text-sm text-muted-foreground">Disponíveis</p>
                 <p className="text-2xl font-bold">
-                  {totalCaminhoes - kpis.janeiro.fretesAtivos} caminhões
+                  {totalCaminhoes - kpisIntegrados.janeiro.fretesAtivos} caminhões
                 </p>
               </div>
             </div>
@@ -529,8 +673,8 @@ export default function Dashboard() {
               <ul className="text-sm space-y-1 text-muted-foreground">
                 <li>• Ocupação média do mês: {dadosOcupacaoSemanal.reduce((acc, d) => acc + d.ocupacao, 0) / 4}%</li>
                 <li>• Pico de ocupação na Semana 3 (100% da frota utilizada)</li>
-                <li>• {totalCaminhoes - kpis.janeiro.fretesAtivos} caminhões disponíveis para novos fretes</li>
-                <li>• Recomendação: {kpis.janeiro.taxaOcupacao > 80 ? "Considerar expansão da frota" : "Capacidade adequada para demanda atual"}</li>
+                <li>• {totalCaminhoes - kpisIntegrados.janeiro.fretesAtivos} caminhões disponíveis para novos fretes</li>
+                <li>• Recomendação: {kpisIntegrados.janeiro.taxaOcupacao > 80 ? "Considerar expansão da frota" : "Capacidade adequada para demanda atual"}</li>
               </ul>
             </div>
           </div>
@@ -552,19 +696,19 @@ export default function Dashboard() {
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <p className="text-sm text-muted-foreground">Receita Jan/25</p>
                 <p className="text-2xl font-bold text-primary">
-                  R$ {(kpis.janeiro.totalReceita / 1000).toFixed(1)}k
+                  R$ {(kpisIntegrados.janeiro.totalReceita / 1000).toFixed(1)}k
                 </p>
               </div>
               <div className="p-4 bg-loss/5 rounded-lg border border-loss/20">
                 <p className="text-sm text-muted-foreground">Custos Jan/25</p>
                 <p className="text-2xl font-bold text-loss">
-                  R$ {(kpis.janeiro.totalCustos / 1000).toFixed(1)}k
+                  R$ {(kpisIntegrados.janeiro.totalCustos / 1000).toFixed(1)}k
                 </p>
               </div>
               <div className="p-4 bg-profit/5 rounded-lg border border-profit/20">
                 <p className="text-sm text-muted-foreground">Lucro Jan/25</p>
                 <p className="text-2xl font-bold text-profit">
-                  R$ {(kpis.janeiro.totalResultado / 1000).toFixed(1)}k
+                  R$ {(kpisIntegrados.janeiro.totalResultado / 1000).toFixed(1)}k
                 </p>
               </div>
             </div>
@@ -597,8 +741,8 @@ export default function Dashboard() {
               <h4 className="font-semibold">📊 Análise Financeira</h4>
               <ul className="text-sm space-y-1 text-muted-foreground">
                 <li>• Lucro total dos últimos 6 meses: R$ {(dadosResultadoMensal.reduce((acc, d) => acc + d.lucro, 0) / 1000).toFixed(1)}k</li>
-                <li>• Margem de lucro em Janeiro: {((kpis.janeiro.totalResultado / kpis.janeiro.totalReceita) * 100).toFixed(1)}%</li>
-                <li>• Crescimento de {kpis.trends.resultado.toFixed(1)}% no resultado vs. mês anterior</li>
+                <li>• Margem de lucro em Janeiro: {((kpisIntegrados.janeiro.totalResultado / kpisIntegrados.janeiro.totalReceita) * 100).toFixed(1)}%</li>
+                <li>• Crescimento de {kpisIntegrados.trends.resultado.toFixed(1)}% no resultado vs. mês anterior</li>
                 <li>• Melhor mês: Set/24 com R$ 27,4k de lucro líquido</li>
               </ul>
             </div>
