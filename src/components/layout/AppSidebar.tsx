@@ -20,9 +20,9 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Fretes", href: "/fretes", icon: Route },
-  { name: "Caminhões", href: "/caminhoes", icon: Truck },
+  { name: "Frota", href: "/frota", icon: Truck },
   { name: "Motoristas", href: "/motoristas", icon: Users },
-  { name: "Mercadorias", href: "/mercadorias", icon: Package },
+  { name: "Fazendas", href: "/fazendas", icon: Package },
   { name: "Custos", href: "/custos", icon: DollarSign },
   { name: "Pagamentos", href: "/pagamentos", icon: CreditCard },
   { name: "Relatórios", href: "/relatorios", icon: FileText },

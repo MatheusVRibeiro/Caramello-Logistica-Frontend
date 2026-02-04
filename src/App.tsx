@@ -8,9 +8,9 @@ import { ProtectedRoute } from "@/auth/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Fretes from "./pages/Fretes";
-import Caminhoes from "./pages/Caminhoes";
+import Frota from "./pages/Frota";
 import Motoristas from "./pages/Motoristas";
-import Mercadorias from "./pages/Mercadorias";
+import Fazendas from "./pages/Fazendas";
 import Custos from "./pages/Custos";
 import Relatorios from "./pages/Relatorios";
 import Indicadores from "./pages/Indicadores";
@@ -48,10 +48,10 @@ const App = () => (
               }
             />
             <Route
-              path="/caminhoes"
+              path="/frota"
               element={
                 <ProtectedRoute>
-                  <Caminhoes />
+                  <Frota />
                 </ProtectedRoute>
               }
             />
@@ -64,10 +64,10 @@ const App = () => (
               }
             />
             <Route
-              path="/mercadorias"
+              path="/fazendas"
               element={
                 <ProtectedRoute>
-                  <Mercadorias />
+                  <Fazendas />
                 </ProtectedRoute>
               }
             />

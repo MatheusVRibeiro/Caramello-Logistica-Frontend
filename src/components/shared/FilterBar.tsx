@@ -17,8 +17,10 @@ export function FilterBar({
   children,
 }: FilterBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-3 mb-6">
-      <div className="relative flex-1 max-w-sm">
+    <div className="flex flex-col sm:flex-row items-end gap-3 mb-6">
+      <div className="flex-1 max-w-sm">
+        <label className="text-xs text-muted-foreground block mb-1">Buscar</label>
+        <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           value={searchValue}
@@ -36,6 +38,7 @@ export function FilterBar({
             <X className="h-4 w-4" />
           </Button>
         )}
+        </div>
       </div>
       {children}
     </div>

@@ -36,6 +36,7 @@ interface Motorista {
   email: string;
   cnh: string;
   cnhValidade: string;
+  cnhCategoria?: "A" | "B" | "C" | "D" | "E";
   status: "ativo" | "inativo" | "ferias";
   tipo: "proprio" | "terceirizado";
   receitaGerada: number;
@@ -71,6 +72,7 @@ const motoristasData: Motorista[] = [
     email: "carlos.silva@email.com",
     cnh: "12345678900",
     cnhValidade: "15/08/2027",
+    cnhCategoria: "E",
     status: "ativo",
     tipo: "proprio",
     receitaGerada: 89500,
@@ -90,6 +92,7 @@ const motoristasData: Motorista[] = [
     email: "joao.oliveira@email.com",
     cnh: "23456789011",
     cnhValidade: "22/10/2026",
+    cnhCategoria: "E",
     status: "ativo",
     tipo: "terceirizado",
     receitaGerada: 78200,
@@ -111,6 +114,7 @@ const motoristasData: Motorista[] = [
     email: "pedro.santos@email.com",
     cnh: "34567890122",
     cnhValidade: "10/05/2028",
+    cnhCategoria: "E",
     status: "ferias",
     tipo: "proprio",
     receitaGerada: 72100,
@@ -130,6 +134,7 @@ const motoristasData: Motorista[] = [
     email: "andre.costa@email.com",
     cnh: "45678901233",
     cnhValidade: "05/12/2025",
+    cnhCategoria: "E",
     status: "ativo",
     tipo: "terceirizado",
     receitaGerada: 65800,
@@ -149,6 +154,7 @@ const motoristasData: Motorista[] = [
     email: "lucas.ferreira@email.com",
     cnh: "56789012344",
     cnhValidade: "18/03/2024",
+    cnhCategoria: "E",
     status: "inativo",
     tipo: "proprio",
     receitaGerada: 58400,
@@ -352,9 +358,9 @@ export default function Motoristas() {
 
   // Simulated freight history
   const historicoFretes = [
-    { id: "#1250", rota: "SP → RJ", data: "20/01/2025", valor: "R$ 15.000" },
-    { id: "#1245", rota: "PR → SC", data: "15/01/2025", valor: "R$ 8.500" },
-    { id: "#1240", rota: "MG → DF", data: "10/01/2025", valor: "R$ 12.000" },
+    { id: "FRETE-2026-001", rota: "SP → RJ", data: "20/01/2025", valor: "R$ 15.000" },
+    { id: "FRETE-2026-007", rota: "PR → SC", data: "15/01/2025", valor: "R$ 8.500" },
+    { id: "FRETE-2026-015", rota: "MG → DF", data: "10/01/2025", valor: "R$ 12.000" },
   ];
 
   return (
@@ -426,27 +432,33 @@ export default function Motoristas() {
         onSearchChange={setSearch}
         searchPlaceholder="Buscar por nome ou CPF..."
       >
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="ativo">Ativo</SelectItem>
-            <SelectItem value="inativo">Inativo</SelectItem>
-            <SelectItem value="ferias">Férias</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={tipoFilter} onValueChange={setTipoFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="proprio">Próprio</SelectItem>
-            <SelectItem value="terceirizado">Terceirizado</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground block">Status</Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="ativo">Ativo</SelectItem>
+              <SelectItem value="inativo">Inativo</SelectItem>
+              <SelectItem value="ferias">Férias</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground block">Tipo</Label>
+          <Select value={tipoFilter} onValueChange={setTipoFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="proprio">Próprio</SelectItem>
+              <SelectItem value="terceirizado">Terceirizado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </FilterBar>
 
       <DataTable<Motorista>
@@ -478,7 +490,7 @@ export default function Motoristas() {
               </Button>
             </div>
           </DialogHeader>
-          <div className="max-h-[calc(90vh-200px)] overflow-y-auto">
+          <div className="max-h-[calc(90vh-200px)] overflow-y-auto px-1">
           {selectedMotorista && (
             <div className="space-y-6">
               {/* Header */}
@@ -547,9 +559,19 @@ export default function Motoristas() {
                 <Card className="p-4 border-l-4 border-l-orange-500">
                   <p className="text-sm text-muted-foreground mb-2">CNH</p>
                   <p className="font-mono font-bold text-lg">{selectedMotorista.cnh}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Validade: {selectedMotorista.cnhValidade}
-                  </p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <p className="text-xs text-muted-foreground">
+                      Validade: {selectedMotorista.cnhValidade}
+                    </p>
+                    {selectedMotorista.cnhCategoria && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <Badge variant="outline" className="text-xs">
+                          Categoria {selectedMotorista.cnhCategoria}
+                        </Badge>
+                      </>
+                    )}
+                  </div>
                 </Card>
 
                 {selectedMotorista.caminhaoAtual && (
@@ -689,7 +711,7 @@ export default function Motoristas() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto">
+          <div className="space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto px-1">
             {/* Nome e CPF */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -738,7 +760,7 @@ export default function Motoristas() {
             <Separator />
 
             {/* CNH */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="cnh">CNH *</Label>
                 <Input
@@ -756,6 +778,26 @@ export default function Motoristas() {
                   value={editedMotorista.cnhValidade || ""}
                   onChange={(e) => setEditedMotorista({ ...editedMotorista, cnhValidade: e.target.value })}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cnhCategoria">Categoria CNH *</Label>
+                <Select
+                  value={editedMotorista.cnhCategoria || ""}
+                  onValueChange={(value: "A" | "B" | "C" | "D" | "E") => 
+                    setEditedMotorista({ ...editedMotorista, cnhCategoria: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A">A</SelectItem>
+                    <SelectItem value="B">B</SelectItem>
+                    <SelectItem value="C">C</SelectItem>
+                    <SelectItem value="D">D</SelectItem>
+                    <SelectItem value="E">E</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

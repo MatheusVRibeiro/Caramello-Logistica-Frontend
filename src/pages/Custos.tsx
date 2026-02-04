@@ -47,12 +47,15 @@ interface Custo {
   caminhao: string;
   rota: string;
   observacoes?: string;
+  // Campos específicos de combustível
+  litros?: number;
+  tipoCombustivel?: "gasolina" | "diesel" | "etanol" | "gnv";
 }
 
 const custosData: Custo[] = [
   {
     id: "1",
-    freteId: "#1250",
+    freteId: "FRETE-2026-001",
     tipo: "combustivel",
     descricao: "Abastecimento completo",
     valor: 2500,
@@ -62,10 +65,12 @@ const custosData: Custo[] = [
     caminhao: "ABC-1234",
     rota: "São Paulo → Rio de Janeiro",
     observacoes: "Posto Shell - Rodovia Presidente Dutra KM 180",
+    litros: 450,
+    tipoCombustivel: "diesel",
   },
   {
     id: "2",
-    freteId: "#1250",
+    freteId: "FRETE-2026-001",
     tipo: "pedagio",
     descricao: "Via Dutra - trecho completo",
     valor: 850,
@@ -78,7 +83,7 @@ const custosData: Custo[] = [
   },
   {
     id: "3",
-    freteId: "#1249",
+    freteId: "FRETE-2026-002",
     tipo: "manutencao",
     descricao: "Troca de pneus dianteiros",
     valor: 3200,
@@ -91,7 +96,7 @@ const custosData: Custo[] = [
   },
   {
     id: "4",
-    freteId: "#1249",
+    freteId: "FRETE-2026-002",
     tipo: "combustivel",
     descricao: "Abastecimento parcial",
     valor: 1800,
@@ -100,10 +105,12 @@ const custosData: Custo[] = [
     motorista: "João Oliveira",
     caminhao: "XYZ-5678",
     rota: "Curitiba → Florianópolis",
+    litros: 320,
+    tipoCombustivel: "diesel",
   },
   {
     id: "5",
-    freteId: "#1247",
+    freteId: "FRETE-2026-004",
     tipo: "outros",
     descricao: "Estacionamento",
     valor: 150,
@@ -133,6 +140,11 @@ export default function Custos() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCusto, setSelectedCusto] = useState<Custo | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  
+  // Estados do formulário
+  const [formTipo, setFormTipo] = useState<string>("");
+  const [formLitros, setFormLitros] = useState("");
+  const [formTipoCombustivel, setFormTipoCombustivel] = useState("");
 
   const handleRowClick = (custo: Custo) => {
     setSelectedCusto(custo);
@@ -454,12 +466,155 @@ export default function Custos() {
         </div>
       </Card>
 
-      <DataTable<Custo>
-        columns={columns}
-        data={filteredData}
-        onRowClick={handleRowClick}
-        emptyMessage="Nenhum custo encontrado"
-      />
+      {/* Separação por Categoria */}
+      <div className="space-y-6">
+        {/* Combustível */}
+        {filteredData.filter(c => c.tipo === "combustivel").length > 0 && (
+          <Card className="overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/10 border-b border-amber-300 dark:border-amber-800 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-950">
+                    <Fuel className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base">Combustível</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {filteredData.filter(c => c.tipo === "combustivel").length} lançamento{filteredData.filter(c => c.tipo === "combustivel").length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                    R$ {filteredData.filter(c => c.tipo === "combustivel").reduce((acc, c) => acc + c.valor, 0).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DataTable<Custo>
+              columns={columns}
+              data={filteredData.filter(c => c.tipo === "combustivel")}
+              onRowClick={handleRowClick}
+              emptyMessage="Nenhum custo de combustível"
+            />
+          </Card>
+        )}
+
+        {/* Pedágios */}
+        {filteredData.filter(c => c.tipo === "pedagio").length > 0 && (
+          <Card className="overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/10 border-b border-blue-300 dark:border-blue-800 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-950">
+                    <Truck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base">Pedágios</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {filteredData.filter(c => c.tipo === "pedagio").length} lançamento{filteredData.filter(c => c.tipo === "pedagio").length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                    R$ {filteredData.filter(c => c.tipo === "pedagio").reduce((acc, c) => acc + c.valor, 0).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DataTable<Custo>
+              columns={columns}
+              data={filteredData.filter(c => c.tipo === "pedagio")}
+              onRowClick={handleRowClick}
+              emptyMessage="Nenhum custo de pedágio"
+            />
+          </Card>
+        )}
+
+        {/* Manutenção */}
+        {filteredData.filter(c => c.tipo === "manutencao").length > 0 && (
+          <Card className="overflow-hidden">
+            <div className="bg-gradient-to-r from-red-500/20 to-rose-500/10 border-b border-red-300 dark:border-red-800 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-red-100 dark:bg-red-950">
+                    <Wrench className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base">Manutenção</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {filteredData.filter(c => c.tipo === "manutencao").length} lançamento{filteredData.filter(c => c.tipo === "manutencao").length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                    R$ {filteredData.filter(c => c.tipo === "manutencao").reduce((acc, c) => acc + c.valor, 0).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DataTable<Custo>
+              columns={columns}
+              data={filteredData.filter(c => c.tipo === "manutencao")}
+              onRowClick={handleRowClick}
+              emptyMessage="Nenhum custo de manutenção"
+            />
+          </Card>
+        )}
+
+        {/* Outros */}
+        {filteredData.filter(c => c.tipo === "outros").length > 0 && (
+          <Card className="overflow-hidden">
+            <div className="bg-gradient-to-r from-slate-500/20 to-gray-500/10 border-b border-slate-300 dark:border-slate-800 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-900">
+                    <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base">Outros</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {filteredData.filter(c => c.tipo === "outros").length} lançamento{filteredData.filter(c => c.tipo === "outros").length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-lg font-bold text-slate-600 dark:text-slate-400">
+                    R$ {filteredData.filter(c => c.tipo === "outros").reduce((acc, c) => acc + c.valor, 0).toLocaleString("pt-BR")}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DataTable<Custo>
+              columns={columns}
+              data={filteredData.filter(c => c.tipo === "outros")}
+              onRowClick={handleRowClick}
+              emptyMessage="Nenhum outro custo"
+            />
+          </Card>
+        )}
+
+        {/* Empty State */}
+        {filteredData.length === 0 && (
+          <Card className="p-12 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="p-4 rounded-full bg-muted">
+                <FileText className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <p className="text-lg font-medium">Nenhum custo encontrado</p>
+              <p className="text-sm text-muted-foreground">
+                Não há custos registrados ou os filtros não retornaram resultados
+              </p>
+            </div>
+          </Card>
+        )}
+      </div>
 
       {/* Details Modal */}
       {selectedCusto && (
@@ -569,6 +724,47 @@ export default function Custos() {
                 </Card>
               </div>
 
+              {/* Informações de Combustível */}
+              {selectedCusto.tipo === "combustivel" && (selectedCusto.litros || selectedCusto.tipoCombustivel) && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Fuel className="h-4 w-4" />
+                    Informações do Abastecimento
+                  </p>
+                  <Card className="p-4 bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800">
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedCusto.litros && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Litros Abastecidos</p>
+                          <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                            {selectedCusto.litros}L
+                          </p>
+                        </div>
+                      )}
+                      {selectedCusto.tipoCombustivel && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">Tipo de Combustível</p>
+                          <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+                            {selectedCusto.tipoCombustivel === "diesel" && "🚛 Diesel"}
+                            {selectedCusto.tipoCombustivel === "gasolina" && "⛽ Gasolina"}
+                            {selectedCusto.tipoCombustivel === "etanol" && "🌱 Etanol"}
+                            {selectedCusto.tipoCombustivel === "gnv" && "💨 GNV"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    {selectedCusto.litros && selectedCusto.valor && (
+                      <div className="mt-3 pt-3 border-t border-amber-300 dark:border-amber-800">
+                        <p className="text-xs text-muted-foreground mb-1">Preço por Litro</p>
+                        <p className="text-base font-semibold text-foreground">
+                          R$ {(selectedCusto.valor / selectedCusto.litros).toFixed(2)}/L
+                        </p>
+                      </div>
+                    )}
+                  </Card>
+                </div>
+              )}
+
               {/* Observações */}
               {selectedCusto.observacoes && (
                 <div className="space-y-2">
@@ -595,7 +791,7 @@ export default function Custos() {
 
       {/* New Cost Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto px-1">
           <DialogHeader>
             <DialogTitle>Novo Custo</DialogTitle>
           </DialogHeader>
@@ -607,15 +803,15 @@ export default function Custos() {
                   <SelectValue placeholder="Selecione o frete" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1250">#1250 - SP → RJ</SelectItem>
-                  <SelectItem value="1249">#1249 - PR → SC</SelectItem>
-                  <SelectItem value="1248">#1248 - MG → DF</SelectItem>
+                  <SelectItem value="FRETE-2026-001">FRETE-2026-001 - SP para RJ</SelectItem>
+                  <SelectItem value="FRETE-2026-002">FRETE-2026-002 - PR para SC</SelectItem>
+                  <SelectItem value="FRETE-2026-003">FRETE-2026-003 - MG para DF</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="tipo">Tipo de Custo</Label>
-              <Select>
+              <Select value={formTipo} onValueChange={setFormTipo}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
@@ -627,13 +823,68 @@ export default function Custos() {
                 </SelectContent>
               </Select>
             </div>
+            
+            {/* Campos específicos para Combustível */}
+            {formTipo === "combustivel" && (
+              <Card className="p-4 bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Fuel className="h-5 w-5 text-amber-600" />
+                    <h4 className="font-semibold text-amber-900 dark:text-amber-100">Informações do Abastecimento</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="litros">Litros Abastecidos *</Label>
+                      <Input 
+                        id="litros" 
+                        type="number" 
+                        placeholder="Ex: 150" 
+                        value={formLitros}
+                        onChange={(e) => setFormLitros(e.target.value)}
+                        step="0.01"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="tipoCombustivel">Tipo de Combustível *</Label>
+                      <Select value={formTipoCombustivel} onValueChange={setFormTipoCombustivel}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="diesel">Diesel</SelectItem>
+                          <SelectItem value="gasolina">Gasolina</SelectItem>
+                          <SelectItem value="etanol">Etanol</SelectItem>
+                          <SelectItem value="gnv">GNV</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  
+                  {formLitros && formTipoCombustivel && (
+                    <Card className="p-3 bg-white dark:bg-slate-950">
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-semibold text-foreground">{formLitros}L</span> de{' '}
+                        <span className="font-semibold text-foreground">
+                          {formTipoCombustivel === "diesel" && "Diesel"}
+                          {formTipoCombustivel === "gasolina" && "Gasolina"}
+                          {formTipoCombustivel === "etanol" && "Etanol"}
+                          {formTipoCombustivel === "gnv" && "GNV"}
+                        </span>
+                      </p>
+                    </Card>
+                  )}
+                </div>
+              </Card>
+            )}
+            
             <div className="space-y-2">
               <Label htmlFor="descricao">Descrição</Label>
               <Input id="descricao" placeholder="Descreva o custo" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="valor">Valor</Label>
-              <Input id="valor" type="number" placeholder="0,00" />
+              <Input id="valor" type="number" placeholder="0,00" step="0.01" />
             </div>
             <div className="space-y-2">
               <Label>Comprovante</Label>

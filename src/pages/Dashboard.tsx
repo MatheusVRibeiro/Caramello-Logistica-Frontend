@@ -50,20 +50,20 @@ interface EstoqueFazenda {
 
 // Simulação de dados de fretes - em produção virá do backend
 const fretesSimulados = [
-  { id: "#1250", status: "em_transito", receita: 6750, custos: 1720, resultado: 5030, quantidadeSacas: 450, motorista: "Carlos Silva", motoristaId: "1", mes: "jan" },
-  { id: "#1249", status: "concluido", receita: 7600, custos: 1690, resultado: 5910, quantidadeSacas: 380, motorista: "João Oliveira", motoristaId: "2", mes: "jan" },
-  { id: "#1248", status: "pendente", receita: 7500, custos: 0, resultado: 7500, quantidadeSacas: 500, motorista: "Pedro Santos", motoristaId: "3", mes: "jan" },
-  { id: "#1247", status: "concluido", receita: 7500, custos: 1720, resultado: 5780, quantidadeSacas: 300, motorista: "André Costa", motoristaId: "4", mes: "jan" },
-  { id: "#1246", status: "cancelado", receita: 0, custos: 0, resultado: 0, quantidadeSacas: 0, motorista: "Lucas Ferreira", motoristaId: "5", mes: "jan" },
-  { id: "#1245", status: "concluido", receita: 6000, custos: 1650, resultado: 4350, quantidadeSacas: 400, motorista: "Carlos Silva", motoristaId: "1", mes: "jan" },
-  { id: "#1244", status: "concluido", receita: 5250, custos: 1580, resultado: 3670, quantidadeSacas: 350, motorista: "João Oliveira", motoristaId: "2", mes: "jan" },
-  { id: "#1243", status: "em_transito", receita: 6750, custos: 1700, resultado: 5050, quantidadeSacas: 450, motorista: "Pedro Santos", motoristaId: "3", mes: "jan" },
+  { id: "FRETE-2026-001", status: "em_transito", receita: 6750, custos: 1720, resultado: 5030, quantidadeSacas: 450, motorista: "Carlos Silva", motoristaId: "1", mes: "jan" },
+  { id: "FRETE-2026-002", status: "concluido", receita: 7600, custos: 1690, resultado: 5910, quantidadeSacas: 380, motorista: "João Oliveira", motoristaId: "2", mes: "jan" },
+  { id: "FRETE-2026-003", status: "pendente", receita: 7500, custos: 0, resultado: 7500, quantidadeSacas: 500, motorista: "Pedro Santos", motoristaId: "3", mes: "jan" },
+  { id: "FRETE-2026-004", status: "concluido", receita: 7500, custos: 1720, resultado: 5780, quantidadeSacas: 300, motorista: "André Costa", motoristaId: "4", mes: "jan" },
+  { id: "FRETE-2026-005", status: "cancelado", receita: 0, custos: 0, resultado: 0, quantidadeSacas: 0, motorista: "Lucas Ferreira", motoristaId: "5", mes: "jan" },
+  { id: "FRETE-2026-007", status: "concluido", receita: 6000, custos: 1650, resultado: 4350, quantidadeSacas: 400, motorista: "Carlos Silva", motoristaId: "1", mes: "jan" },
+  { id: "FRETE-2026-008", status: "concluido", receita: 5250, custos: 1580, resultado: 3670, quantidadeSacas: 350, motorista: "João Oliveira", motoristaId: "2", mes: "jan" },
+  { id: "FRETE-2026-009", status: "em_transito", receita: 6750, custos: 1700, resultado: 5050, quantidadeSacas: 450, motorista: "Pedro Santos", motoristaId: "3", mes: "jan" },
   // Dados do mês anterior (dez)
-  { id: "#1200", status: "concluido", receita: 6000, custos: 1600, resultado: 4400, quantidadeSacas: 400, motorista: "Carlos Silva", motoristaId: "1", mes: "dez" },
-  { id: "#1201", status: "concluido", receita: 7200, custos: 1680, resultado: 5520, quantidadeSacas: 360, motorista: "João Oliveira", motoristaId: "2", mes: "dez" },
-  { id: "#1202", status: "concluido", receita: 6750, custos: 1620, resultado: 5130, quantidadeSacas: 450, motorista: "Pedro Santos", motoristaId: "3", mes: "dez" },
-  { id: "#1203", status: "concluido", receita: 7000, custos: 1700, resultado: 5300, quantidadeSacas: 280, motorista: "André Costa", motoristaId: "4", mes: "dez" },
-  { id: "#1204", status: "concluido", receita: 5500, custos: 1550, resultado: 3950, quantidadeSacas: 380, motorista: "Lucas Ferreira", motoristaId: "5", mes: "dez" },
+  { id: "FRETE-2026-014", status: "concluido", receita: 6000, custos: 1600, resultado: 4400, quantidadeSacas: 400, motorista: "Carlos Silva", motoristaId: "1", mes: "dez" },
+  { id: "FRETE-2026-013", status: "concluido", receita: 7200, custos: 1680, resultado: 5520, quantidadeSacas: 360, motorista: "João Oliveira", motoristaId: "2", mes: "dez" },
+  { id: "FRETE-2026-012", status: "concluido", receita: 6750, custos: 1620, resultado: 5130, quantidadeSacas: 450, motorista: "Pedro Santos", motoristaId: "3", mes: "dez" },
+  { id: "FRETE-2026-011", status: "concluido", receita: 7000, custos: 1700, resultado: 5300, quantidadeSacas: 280, motorista: "André Costa", motoristaId: "4", mes: "dez" },
+  { id: "FRETE-2026-010", status: "concluido", receita: 5500, custos: 1550, resultado: 3950, quantidadeSacas: 380, motorista: "Lucas Ferreira", motoristaId: "5", mes: "dez" },
 ];
 
 const totalCaminhoes = 5;
@@ -77,7 +77,7 @@ const smartAlerts: SmartAlert[] = [
     description: "2.1 milhões de sacas disponíveis em 4 fazendas ativas. Acompanhamento em tempo real.",
     action: {
       label: "Ver detalhes",
-      onClick: () => toast.info("Navegando para gestão de mercadorias"),
+      onClick: () => toast.info("Navegando para gestão de fazendas"),
     },
   },
   {
@@ -298,13 +298,13 @@ export default function Dashboard() {
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30">
             <CardContent className="p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total Sacas</span>
+                <span className="text-base font-semibold text-muted-foreground">Total Sacas</span>
                 <Package className="w-5 h-5 text-blue-600" />
               </div>
-              <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+              <p className="text-3xl font-bold text-blue-900 dark:text-blue-100">
                 {kpisIntegrados.estoques.totalSacas.toLocaleString("pt-BR")}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 {kpisIntegrados.estoques.percentualConsumido.toFixed(1)}% consumidas
               </p>
             </CardContent>
@@ -313,13 +313,13 @@ export default function Dashboard() {
           <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30">
             <CardContent className="p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total Peso</span>
+                <span className="text-base font-semibold text-muted-foreground">Total Peso</span>
                 <Weight className="w-5 h-5 text-purple-600" />
               </div>
-              <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+              <p className="text-3xl font-bold text-purple-900 dark:text-purple-100">
                 {kpisIntegrados.estoques.totalToneladas.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} ton
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 Peso médio por saca: 25kg
               </p>
             </CardContent>
@@ -328,13 +328,13 @@ export default function Dashboard() {
           <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30">
             <CardContent className="p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Valor Total</span>
+                <span className="text-base font-semibold text-muted-foreground">Valor Total</span>
                 <DollarSign className="w-5 h-5 text-green-600" />
               </div>
-              <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+              <p className="text-3xl font-bold text-green-900 dark:text-green-100">
                 R$ {(kpisIntegrados.estoques.totalValor / 1000000).toFixed(2)}M
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 Avaliação de estoque
               </p>
             </CardContent>
@@ -347,15 +347,15 @@ export default function Dashboard() {
           }`}>
             <CardContent className="p-4 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Alertas</span>
+                <span className="text-base font-semibold text-muted-foreground">Alertas</span>
                 <AlertTriangle className={`w-5 h-5 ${
                   kpisIntegrados.estoques.fazendasCriticas > 0 ? "text-red-600" : "text-green-600"
                 }`} />
               </div>
-              <p className="text-2xl font-bold">
+              <p className="text-3xl font-bold">
                 {kpisIntegrados.estoques.fazendasCriticas}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 {kpisIntegrados.estoques.fazendasCriticas > 0
                   ? "fazenda(s) em nível crítico"
                   : "todos os estoques normais"}

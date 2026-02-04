@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -10,6 +10,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { format, parse } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -26,6 +30,12 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
   Plus,
   FileText,
   Edit,
@@ -38,6 +48,11 @@ import {
   Check,
   Clock,
   AlertCircle,
+  Lock,
+  Unlock,
+  TrendingUp,
+  TrendingDown,
+  FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -122,56 +137,164 @@ const fretesData: {
   { id: "F005", motoristaId: "4", dataFrete: "19/01/2025", rota: "MG → DF", toneladas: 55, valorGerado: 8250 },
 ];
 
+// Dados de custos adicionais para cada frete
+interface CustoAdicional {
+  freteId: string;
+  valor: number;
+  descricao: string;
+}
+
+const custosAdicionaisData: CustoAdicional[] = [
+  { freteId: "F001", valor: 1200, descricao: "Combustível" },
+  { freteId: "F001", valor: 400, descricao: "Pedágio" },
+  { freteId: "F002", valor: 1500, descricao: "Combustível" },
+  { freteId: "F002", valor: 850, descricao: "Pedágio" },
+  { freteId: "F003", valor: 1100, descricao: "Combustível" },
+  { freteId: "F003", valor: 590, descricao: "Pedágio" },
+  { freteId: "F004", valor: 950, descricao: "Combustível" },
+  { freteId: "F004", valor: 770, descricao: "Pedágio" },
+];
+
 const pagamentosData: PagamentoMotorista[] = [
   {
-    id: "P001",
+    id: "PAG-2026-001",
     motoristaId: "1",
     motoristaNome: "Carlos Silva",
-    dataFrete: "15-20/01/2025",
+    dataFrete: "15-20/01/2026",
     toneladas: 85,
     fretes: 2,
     valorUnitarioPorTonelada: 150,
     valorTotal: 12750,
     fretesSelecionados: ["F001", "F002"],
-    dataPagamento: "22/01/2025",
+    dataPagamento: "22/01/2026",
     statusPagamento: "pago",
     metodoPagamento: "pix",
     comprovante: {
       nome: "comprovante_pix_001.pdf",
       url: "#",
-      datadoUpload: "22/01/2025",
+      datadoUpload: "22/01/2026",
     },
     observacoes: "Pagamento via PIX realizado com sucesso",
   },
   {
-    id: "P002",
+    id: "PAG-2026-002",
     motoristaId: "2",
     motoristaNome: "João Oliveira",
-    dataFrete: "18/01/2025",
+    dataFrete: "18/01/2026",
     toneladas: 45,
     fretes: 1,
     valorUnitarioPorTonelada: 150,
     valorTotal: 6750,
     fretesSelecionados: ["F003"],
-    dataPagamento: "25/01/2025",
+    dataPagamento: "25/01/2026",
     statusPagamento: "processando",
     metodoPagamento: "transferencia_bancaria",
     observacoes: "Em processamento - transferência bancária",
   },
   {
-    id: "P003",
+    id: "PAG-2026-003",
     motoristaId: "3",
     motoristaNome: "Pedro Santos",
-    dataFrete: "17/01/2025",
+    dataFrete: "17/01/2026",
     toneladas: 40,
     fretes: 1,
     valorUnitarioPorTonelada: 150,
     valorTotal: 6000,
     fretesSelecionados: ["F004"],
-    dataPagamento: "28/01/2025",
+    dataPagamento: "28/01/2026",
     statusPagamento: "pendente",
     metodoPagamento: "pix",
     observacoes: "",
+  },
+  {
+    id: "PAG-2026-004",
+    motoristaId: "4",
+    motoristaNome: "André Costa",
+    dataFrete: "12/01/2026",
+    toneladas: 55,
+    fretes: 1,
+    valorUnitarioPorTonelada: 150,
+    valorTotal: 8250,
+    fretesSelecionados: ["F005"],
+    dataPagamento: "15/01/2026",
+    statusPagamento: "pago",
+    metodoPagamento: "pix",
+    comprovante: {
+      nome: "comprovante_pix_004.pdf",
+      url: "#",
+      datadoUpload: "15/01/2026",
+    },
+    observacoes: "Pagamento antecipado",
+  },
+  {
+    id: "PAG-2026-005",
+    motoristaId: "5",
+    motoristaNome: "Lucas Ferreira",
+    dataFrete: "05-10/01/2026",
+    toneladas: 92,
+    fretes: 2,
+    valorUnitarioPorTonelada: 145,
+    valorTotal: 13340,
+    fretesSelecionados: ["F001", "F003"],
+    dataPagamento: "18/01/2026",
+    statusPagamento: "pago",
+    metodoPagamento: "transferencia_bancaria",
+    comprovante: {
+      nome: "ted_005.pdf",
+      url: "#",
+      datadoUpload: "18/01/2026",
+    },
+    observacoes: "Transferência bancária confirmada",
+  },
+  {
+    id: "PAG-2026-006",
+    motoristaId: "1",
+    motoristaNome: "Carlos Silva",
+    dataFrete: "23-25/01/2026",
+    toneladas: 65,
+    fretes: 2,
+    valorUnitarioPorTonelada: 148,
+    valorTotal: 9620,
+    fretesSelecionados: ["F002", "F004"],
+    dataPagamento: "30/01/2026",
+    statusPagamento: "pendente",
+    metodoPagamento: "pix",
+    observacoes: "Aguardando confirmação do motorista",
+  },
+  {
+    id: "PAG-2026-007",
+    motoristaId: "2",
+    motoristaNome: "João Oliveira",
+    dataFrete: "08-12/01/2026",
+    toneladas: 78,
+    fretes: 3,
+    valorUnitarioPorTonelada: 152,
+    valorTotal: 11856,
+    fretesSelecionados: ["F001", "F002", "F003"],
+    dataPagamento: "20/01/2026",
+    statusPagamento: "pago",
+    metodoPagamento: "pix",
+    comprovante: {
+      nome: "pix_007_joao.pdf",
+      url: "#",
+      datadoUpload: "20/01/2026",
+    },
+    observacoes: "Pagamento múltiplos fretes",
+  },
+  {
+    id: "PAG-2026-008",
+    motoristaId: "3",
+    motoristaNome: "Pedro Santos",
+    dataFrete: "14/01/2026",
+    toneladas: 48,
+    fretes: 1,
+    valorUnitarioPorTonelada: 155,
+    valorTotal: 7440,
+    fretesSelecionados: ["F004"],
+    dataPagamento: "29/01/2026",
+    statusPagamento: "cancelado",
+    metodoPagamento: "pix",
+    observacoes: "Pagamento cancelado - erro nos dados",
   },
 ];
 
@@ -185,12 +308,25 @@ const statusConfig = {
 export default function Pagamentos() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [motoristaFilter, setMotoristaFilter] = useState<string>("all");
   const [selectedPagamento, setSelectedPagamento] = useState<PagamentoMotorista | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedPagamento, setEditedPagamento] = useState<Partial<PagamentoMotorista>>({});
+  const [dataPagamentoSelected, setDataPagamentoSelected] = useState<Date | undefined>();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFretes, setSelectedFretes] = useState<string[]>([]);
+  
+  // Novos estados para Exercício (Ano/Mês) e Fechamento
+  const [selectedPeriodo, setSelectedPeriodo] = useState("2026-01"); // Janeiro 2026
+  const [mesesFechados, setMesesFechados] = useState<string[]>([]); // Meses que já foram fechados
+  
+  // Dados históricos para comparação (simulado - mes anterior)
+  const dadosMesAnterior = {
+    periodo: "2025-12",
+    totalPago: 21500, // Dezembro 2025 pagou R$ 21.500
+    totalMotoristas: 4,
+  };
 
   const handleOpenNewModal = () => {
     setEditedPagamento({
@@ -243,7 +379,13 @@ export default function Pagamentos() {
 
     const fretesSelecionados = fretesData.filter((f) => nextSelected.includes(f.id));
     const toneladas = fretesSelecionados.reduce((acc, f) => acc + f.toneladas, 0);
-    const valorTotal = fretesSelecionados.reduce((acc, f) => acc + f.valorGerado, 0);
+    const valorBruto = fretesSelecionados.reduce((acc, f) => acc + f.valorGerado, 0);
+    const custosTotais = nextSelected.reduce((acc, freteId) => {
+      return acc + custosAdicionaisData
+        .filter(c => c.freteId === freteId)
+        .reduce((sum, c) => sum + c.valor, 0);
+    }, 0);
+    const valorTotal = valorBruto - custosTotais;
     const dataFrete = fretesSelecionados.map((f) => f.dataFrete).join(", ");
     const valorUnitario = toneladas > 0 ? valorTotal / toneladas : 0;
 
@@ -292,13 +434,393 @@ export default function Pagamentos() {
     setIsModalOpen(false);
   };
 
-  const filteredData = pagamentosData.filter((pagamento) => {
+  // Função para fechar/abrir o mês
+  const handleToggleFecharMes = () => {
+    const mesFechado = mesesFechados.includes(selectedPeriodo);
+    if (mesFechado) {
+      setMesesFechados(mesesFechados.filter((m) => m !== selectedPeriodo));
+      toast.success(`Mês ${selectedPeriodo} reaberto para edição`);
+    } else {
+      setMesesFechados([...mesesFechados, selectedPeriodo]);
+      toast.success(`Mês ${selectedPeriodo} fechado com sucesso!`);
+    }
+  };
+
+  // Função para exportar PDF profissional e completo
+  const handleExportarPDF = () => {
+    const doc = new jsPDF();
+    
+    // ==================== CABEÇALHO PREMIUM ====================
+    // Fundo azul do cabeçalho
+    doc.setFillColor(37, 99, 235);
+    doc.rect(0, 0, 210, 50, "F");
+    
+    // Logo/Nome da empresa em branco
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("RN LOGÍSTICA", 105, 18, { align: "center" });
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("RELATÓRIO DE PAGAMENTOS A MOTORISTAS", 105, 35, { align: "center" });
+    
+    const [ano, mes] = selectedPeriodo.split("-");
+    const nomeMes = format(new Date(parseInt(ano), parseInt(mes) - 1), "MMMM yyyy", { locale: ptBR });
+    const nomeFormatado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Período de Referência: ${nomeFormatado}`, 105, 42, { align: "center" });
+    
+    doc.setFontSize(8);
+    doc.text(`Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, 105, 47, { align: "center" });
+    
+    doc.setTextColor(0, 0, 0);
+    
+    // Cálculos gerais
+    const totalPago = filteredData.filter((p) => p.statusPagamento === "pago").reduce((acc, p) => acc + p.valorTotal, 0);
+    const totalPendente = filteredData.filter((p) => p.statusPagamento === "pendente").reduce((acc, p) => acc + p.valorTotal, 0);
+    const totalBruto = filteredData.reduce((acc, p) => {
+      const fretes = p.fretesSelecionados || [];
+      return acc + fretes.reduce((sum, freteId) => {
+        const frete = fretesData.find((f) => f.id === freteId);
+        return sum + (frete?.valorGerado || 0);
+      }, 0);
+    }, 0);
+    const totalDescontos = filteredData.reduce((acc, p) => {
+      const fretes = p.fretesSelecionados || [];
+      return acc + fretes.reduce((sum, freteId) => {
+        return sum + custosAdicionaisData.filter((c) => c.freteId === freteId).reduce((s, c) => s + c.valor, 0);
+      }, 0);
+    }, 0);
+    const totalLiquido = totalBruto - totalDescontos;
+    const qtdMotoristas = new Set(filteredData.map((p) => p.motoristaId)).size;
+    const qtdFretes = filteredData.reduce((acc, p) => acc + p.fretes, 0);
+    const totalToneladas = filteredData.reduce((acc, p) => acc + p.toneladas, 0);
+    const fretesSelecionadosIds = new Set(
+      filteredData.flatMap((p) => p.fretesSelecionados || [])
+    );
+    const ultimoFreteDate = fretesData
+      .filter((f) => fretesSelecionadosIds.has(f.id))
+      .map((f) => parse(f.dataFrete, "dd/MM/yyyy", new Date(0)))
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+    const ultimoFreteFormatado = ultimoFreteDate
+      ? format(ultimoFreteDate, "dd/MM/yyyy")
+      : "—";
+    
+    // ==================== INFORMAÇÕES DO RELATÓRIO ====================
+    let yPosition = 56;
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(15, yPosition, 180, 22, 2, 2, "F");
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(15, yPosition, 180, 22, 2, 2, "S");
+    
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.setFont("helvetica", "bold");
+    doc.text("Período:", 20, yPosition + 7);
+    doc.setFont("helvetica", "normal");
+    doc.text(nomeFormatado, 40, yPosition + 7);
+    doc.setFont("helvetica", "bold");
+    doc.text("Último frete:", 140, yPosition + 7);
+    doc.setFont("helvetica", "normal");
+    doc.text(ultimoFreteFormatado, 175, yPosition + 7);
+    
+    doc.setFont("helvetica", "bold");
+    doc.text("Motoristas:", 20, yPosition + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${qtdMotoristas}`, 50, yPosition + 15);
+    doc.setFont("helvetica", "bold");
+    doc.text("Fretes:", 90, yPosition + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${qtdFretes}`, 108, yPosition + 15);
+    doc.setFont("helvetica", "bold");
+    doc.text("Toneladas:", 140, yPosition + 15);
+    doc.setFont("helvetica", "normal");
+    doc.text(`${totalToneladas.toFixed(0)}t`, 170, yPosition + 15);
+    
+    yPosition += 28;
+    
+    // ==================== RESUMO EXECUTIVO ====================
+    doc.setFillColor(241, 245, 249);
+    doc.rect(15, yPosition, 180, 8, "F");
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text("RESUMO DE PAGAMENTOS", 20, yPosition + 5.5);
+    
+    yPosition += 12;
+    
+    // Cards de resumo em 3 colunas
+    doc.setTextColor(0, 0, 0);
+    
+    // Card 1 - Valores Brutos
+    doc.setFillColor(219, 234, 254);
+    doc.roundedRect(15, yPosition, 58, 28, 2, 2, "F");
+    doc.setDrawColor(59, 130, 246);
+    doc.setLineWidth(0.5);
+    doc.roundedRect(15, yPosition, 58, 28, 2, 2, "S");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text("Valor Bruto (Fretes)", 20, yPosition + 5);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(37, 99, 235);
+    doc.text(`R$ ${totalBruto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 20, yPosition + 13);
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`${qtdFretes} frete(s) • ${qtdMotoristas} motorista(s)`, 20, yPosition + 19);
+    doc.text(`${filteredData.length} pagamento(s) • ${totalToneladas.toFixed(0)}t`, 20, yPosition + 24);
+    
+    // Card 2 - Descontos
+    doc.setFillColor(254, 226, 226);
+    doc.roundedRect(78, yPosition, 58, 28, 2, 2, "F");
+    doc.setDrawColor(239, 68, 68);
+    doc.roundedRect(78, yPosition, 58, 28, 2, 2, "S");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text("Total de Descontos", 83, yPosition + 5);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(220, 38, 38);
+    doc.text(`-R$ ${totalDescontos.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 83, yPosition + 13);
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    const percDesconto = totalBruto > 0 ? (totalDescontos / totalBruto) * 100 : 0;
+    doc.text(`${percDesconto.toFixed(1)}% do valor bruto`, 83, yPosition + 19);
+    doc.text("Combustivel e pedagios", 83, yPosition + 24);
+    
+    // Card 3 - Valor Líquido
+    doc.setFillColor(220, 252, 231);
+    doc.roundedRect(141, yPosition, 54, 28, 2, 2, "F");
+    doc.setDrawColor(34, 197, 94);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(141, yPosition, 54, 28, 2, 2, "S");
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text("Valor Liquido a Pagar", 146, yPosition + 5);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(22, 163, 74);
+    doc.text(`R$ ${totalLiquido.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 146, yPosition + 13);
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Pago: R$ ${totalPago.toLocaleString("pt-BR")}`, 146, yPosition + 19);
+    doc.text(`Pendente: R$ ${totalPendente.toLocaleString("pt-BR")}`, 146, yPosition + 24);
+    
+    yPosition += 35;
+    
+    // ==================== DETALHAMENTO POR MOTORISTA ====================
+    doc.setFillColor(241, 245, 249);
+    doc.rect(15, yPosition, 180, 8, "F");
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text("DETALHAMENTO POR MOTORISTA", 20, yPosition + 5.5);
+    
+    yPosition += 12;
+    
+    // Tabela detalhada de pagamentos
+    const tableData = filteredData.map((p) => {
+      const fretesIds = (p.fretesSelecionados || []).join(", ");
+      const valorBruto = (p.fretesSelecionados || []).reduce((sum, freteId) => {
+        const frete = fretesData.find((f) => f.id === freteId);
+        return sum + (frete?.valorGerado || 0);
+      }, 0);
+      const descontos = (p.fretesSelecionados || []).reduce((sum, freteId) => {
+        return sum + custosAdicionaisData.filter((c) => c.freteId === freteId).reduce((s, c) => s + c.valor, 0);
+      }, 0);
+      
+      return [
+        p.id,
+        p.motoristaNome,
+        fretesIds,
+        `${p.toneladas}t`,
+        `R$ ${valorBruto.toLocaleString("pt-BR")}`,
+        `R$ ${descontos.toLocaleString("pt-BR")}`,
+        `R$ ${p.valorTotal.toLocaleString("pt-BR")}`,
+        statusConfig[p.statusPagamento].label,
+      ];
+    });
+    
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["ID", "Motorista", "Fretes Realiz.", "Carga", "Val. Bruto", "Descontos", "Val. Liquido", "Status"]],
+      body: tableData,
+      theme: "grid",
+      headStyles: { 
+        fillColor: [37, 99, 235],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 10,
+        halign: "center",
+      },
+      styles: { 
+        fontSize: 9,
+        cellPadding: 3,
+      },
+      columnStyles: {
+        0: { cellWidth: 22, halign: "center", fontStyle: "bold", fontSize: 9 },
+        1: { cellWidth: 32, fontSize: 9 },
+        2: { cellWidth: 28, halign: "center", fontSize: 9 },
+        3: { cellWidth: 14, halign: "center", fontSize: 9 },
+        4: { cellWidth: 20, halign: "right", fontSize: 9 },
+        5: { cellWidth: 20, halign: "right", textColor: [220, 38, 38], fontSize: 9 },
+        6: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [22, 163, 74], fontSize: 9 },
+        7: { cellWidth: 17, halign: "center", fontSize: 9 },
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      didParseCell: (data) => {
+        if (data.section === "body") {
+          if ([0, 1].includes(data.column.index)) {
+            data.cell.styles.fontStyle = "bold";
+          }
+          if ([4, 5, 6].includes(data.column.index)) {
+            data.cell.styles.fontStyle = "bold";
+          }
+        }
+      },
+    });
+    
+    // ==================== DETALHAMENTO DE CUSTOS POR TIPO ====================
+    const finalY = (doc as any).lastAutoTable.finalY || yPosition;
+    yPosition = finalY + 10;
+    
+    if (yPosition > 250) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    
+    doc.setFillColor(254, 243, 199);
+    doc.rect(15, yPosition, 180, 8, "F");
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(30, 41, 59);
+    doc.text("DESCONTOS POR CATEGORIA", 20, yPosition + 5.5);
+    
+    yPosition += 12;
+    
+    // Calcular custos por tipo
+    const custosPorTipo: { [key: string]: number } = {};
+    filteredData.forEach((pag) => {
+      (pag.fretesSelecionados || []).forEach((freteId) => {
+        custosAdicionaisData.filter((c) => c.freteId === freteId).forEach((custo) => {
+          custosPorTipo[custo.descricao] = (custosPorTipo[custo.descricao] || 0) + custo.valor;
+        });
+      });
+    });
+    
+    const custosTable = Object.entries(custosPorTipo).map(([tipo, valor]) => {
+      const percentual = totalDescontos > 0 ? (valor / totalDescontos) * 100 : 0;
+      return [
+        tipo,
+        `R$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+        `${percentual.toFixed(1)}%`,
+      ];
+    });
+    
+    // Adicionar linha de total
+    custosTable.push([
+      "TOTAL",
+      `R$ ${totalDescontos.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      "100.0%",
+    ]);
+    
+    autoTable(doc, {
+      startY: yPosition,
+      head: [["Tipo de Custo", "Valor Total", "% do Total"]],
+      body: custosTable,
+      theme: "striped",
+      headStyles: {
+        fillColor: [251, 191, 36],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        fontSize: 11,
+      },
+      styles: {
+        fontSize: 10,
+        cellPadding: 4,
+      },
+      columnStyles: {
+        0: { cellWidth: 100, fontSize: 10 },
+        1: { cellWidth: 50, halign: "right", fontStyle: "bold", fontSize: 10 },
+        2: { cellWidth: 30, halign: "center", fontSize: 10 },
+      },
+      didParseCell: (data) => {
+        // Destacar linha de total
+        if (data.row.index === custosTable.length - 1) {
+          data.cell.styles.fillColor = [254, 243, 199];
+          data.cell.styles.fontStyle = "bold";
+          data.cell.styles.textColor = [30, 41, 59];
+        }
+      },
+    });
+    
+    // ==================== FOOTER EM TODAS AS PÁGINAS ====================
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.5);
+      doc.line(15, 280, 195, 280);
+      
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(100, 116, 139);
+      
+      doc.text("RN Logistica - Sistema de Gestao de Fretes", 20, 285);
+      doc.text(`Pagina ${i} de ${pageCount}`, 105, 285, { align: "center" });
+      doc.text(`Relatorio Confidencial`, 190, 285, { align: "right" });
+      
+      doc.setFontSize(6);
+      doc.setTextColor(148, 163, 184);
+      doc.text("Este documento foi gerado automaticamente e contem informacoes confidenciais", 105, 290, { align: "center" });
+    }
+    
+    // ==================== DOWNLOAD ====================
+    const nomeArquivo = `RN_Logistica_Pagamentos_${selectedPeriodo.replace("-", "_")}.pdf`;
+    doc.save(nomeArquivo);
+    toast.success(`PDF "${nomeArquivo}" gerado com sucesso!`, { duration: 4000 });
+  };
+
+  // Filtrar dados por período selecionado
+  const dadosFiltradosPorPeriodo = useMemo(() => {
+    return pagamentosData.filter((p) => {
+      const [dia, mes, ano] = p.dataPagamento.split("/");
+      const periodoItem = `${ano}-${mes}`;
+      return periodoItem === selectedPeriodo;
+    });
+  }, [selectedPeriodo]);
+
+  const filteredData = dadosFiltradosPorPeriodo.filter((pagamento) => {
     const matchesSearch =
       pagamento.motoristaNome.toLowerCase().includes(search.toLowerCase()) ||
       pagamento.id.includes(search);
     const matchesStatus =
       statusFilter === "all" || pagamento.statusPagamento === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesMotorista =
+      motoristaFilter === "all" || pagamento.motoristaId === motoristaFilter;
+    return matchesSearch && matchesStatus && matchesMotorista;
   });
 
   const columns = [
@@ -417,46 +939,155 @@ export default function Pagamentos() {
         title="Pagamentos de Motoristas"
         description="Registre e acompanhe os pagamentos pelos fretes realizados"
         actions={
-          <Button onClick={handleOpenNewModal}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Pagamento
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* Seletor de Exercício (Ano/Mês) */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">Exercício:</Label>
+              <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Selecione o mês" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="2025-11">Novembro 2025</SelectItem>
+                  <SelectItem value="2025-12">Dezembro 2025</SelectItem>
+                  <SelectItem value="2026-01">Janeiro 2026</SelectItem>
+                  <SelectItem value="2026-02">Fevereiro 2026</SelectItem>
+                  <SelectItem value="2026-03">Março 2026</SelectItem>
+                  <SelectItem value="2027-01">Janeiro 2027</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Botão Fechar/Abrir Mês */}
+            <Button
+              variant={mesesFechados.includes(selectedPeriodo) ? "outline" : "secondary"}
+              onClick={handleToggleFecharMes}
+              className="gap-2"
+            >
+              {mesesFechados.includes(selectedPeriodo) ? (
+                <>
+                  <Unlock className="h-4 w-4" />
+                  Reabrir Mês
+                </>
+              ) : (
+                <>
+                  <Lock className="h-4 w-4" />
+                  Fechar Mês
+                </>
+              )}
+            </Button>
+
+            {/* Botão Exportar PDF */}
+            <Button variant="outline" onClick={handleExportarPDF} className="gap-2">
+              <FileDown className="h-4 w-4" />
+              Exportar PDF
+            </Button>
+
+            {/* Botão Novo Pagamento */}
+            <Button 
+              onClick={handleOpenNewModal}
+              disabled={mesesFechados.includes(selectedPeriodo)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Pagamento
+            </Button>
+          </div>
         }
       />
 
-      {/* Summary Cards */}
+      {/* Badge de Status do Mês */}
+      {mesesFechados.includes(selectedPeriodo) && (
+        <div className="mb-4 flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
+          <Lock className="h-4 w-4 text-blue-600" />
+          <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+            Este mês está fechado. Novos pagamentos e edições não são permitidos.
+          </p>
+        </div>
+      )}
+
+      {/* Summary Cards com KPIs Comparativos */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="p-4 bg-muted/50">
+        <Card className="p-6 bg-gradient-to-br from-primary/5 to-transparent border-l-4 border-l-primary hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total de Registros</p>
-              <p className="text-2xl font-bold">{pagamentosData.length}</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total de Registros</p>
+              <p className="text-4xl font-bold mt-2 text-foreground">{dadosFiltradosPorPeriodo.length}</p>
+              <p className="text-xs text-primary mt-2 flex items-center gap-1">
+                {dadosFiltradosPorPeriodo.length === 0 ? "Nenhum pagamento neste período" : "Pagamentos cadastrados"}
+              </p>
             </div>
-            <FileText className="h-8 w-8 text-primary/30" />
+            <FileText className="h-12 w-12 text-primary/20" />
           </div>
         </Card>
 
-        <Card className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900">
+        <Card className="p-6 bg-gradient-to-br from-yellow-50 to-yellow-50/30 dark:from-yellow-950/20 dark:to-yellow-950/10 border-l-4 border-l-yellow-600 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Pendente</p>
-              <p className="text-2xl font-bold text-yellow-600">
-                R$ {totalPendente.toLocaleString("pt-BR")}
+              <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-300 uppercase tracking-wide">Pendente de Pagamento</p>
+              <p className="text-4xl font-bold mt-2 text-yellow-700 dark:text-yellow-400">
+                R$ {dadosFiltradosPorPeriodo
+                  .filter((p) => p.statusPagamento === "pendente")
+                  .reduce((acc, p) => acc + p.valorTotal, 0)
+                  .toLocaleString("pt-BR")}
+              </p>
+              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2 flex items-center gap-1">
+                {dadosFiltradosPorPeriodo.filter(p => p.statusPagamento === "pendente").length} pagamentos
               </p>
             </div>
-            <Clock className="h-8 w-8 text-yellow-600/30" />
+            <Clock className="h-12 w-12 text-yellow-600/20" />
           </div>
         </Card>
 
-        <Card className="p-4 bg-profit/5 border-profit/20">
+        <Card className="p-6 bg-gradient-to-br from-profit/5 to-profit/5 dark:from-profit/5 dark:to-profit/5 border-l-4 border-l-profit hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Pago</p>
-              <p className="text-2xl font-bold text-profit">
-                R$ {totalPago.toLocaleString("pt-BR")}
+              <p className="text-xs font-semibold text-profit/70 uppercase tracking-wide">Já Pago</p>
+              <p className="text-4xl font-bold mt-2 text-profit">
+                R$ {dadosFiltradosPorPeriodo
+                  .filter((p) => p.statusPagamento === "pago")
+                  .reduce((acc, p) => acc + p.valorTotal, 0)
+                  .toLocaleString("pt-BR")}
               </p>
+              <div className="flex items-center gap-2 mt-2">
+                <p className="text-xs text-profit/70 flex items-center gap-1">
+                  {dadosFiltradosPorPeriodo.filter(p => p.statusPagamento === "pago").length} pagamentos
+                </p>
+                {(() => {
+                  const totalAtual = dadosFiltradosPorPeriodo
+                    .filter((p) => p.statusPagamento === "pago")
+                    .reduce((acc, p) => acc + p.valorTotal, 0);
+                  const variacao = dadosMesAnterior.totalPago > 0
+                    ? ((totalAtual - dadosMesAnterior.totalPago) / dadosMesAnterior.totalPago) * 100
+                    : 0;
+                  const temDados = totalAtual > 0;
+                  
+                  return temDados && Math.abs(variacao) > 0 ? (
+                    <Badge
+                      variant={variacao < 0 ? "completed" : "cancelled"}
+                      className={cn(
+                        "text-xs px-2 py-0.5 flex items-center gap-1",
+                        variacao < 0
+                          ? "bg-profit/10 text-profit border-profit/20"
+                          : "bg-loss/10 text-loss border-loss/20"
+                      )}
+                    >
+                      {variacao < 0 ? (
+                        <>
+                          <TrendingDown className="h-3 w-3" />
+                          {Math.abs(variacao).toFixed(0)}% vs mês anterior
+                        </>
+                      ) : (
+                        <>
+                          <TrendingUp className="h-3 w-3" />
+                          +{variacao.toFixed(0)}% vs mês anterior
+                        </>
+                      )}
+                    </Badge>
+                  ) : null;
+                })()}
+              </div>
             </div>
-            <Check className="h-8 w-8 text-profit/30" />
+            <Check className="h-12 w-12 text-profit/20" />
           </div>
         </Card>
       </div>
@@ -466,18 +1097,37 @@ export default function Pagamentos() {
         onSearchChange={setSearch}
         searchPlaceholder="Buscar por motorista ou ID de pagamento..."
       >
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-44">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="pendente">Pendente</SelectItem>
-            <SelectItem value="processando">Processando</SelectItem>
-            <SelectItem value="pago">Pago</SelectItem>
-            <SelectItem value="cancelado">Cancelado</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground block">Motorista</Label>
+          <Select value={motoristaFilter} onValueChange={setMotoristaFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Motorista" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              {motoristas.map((motorista) => (
+                <SelectItem key={motorista.id} value={motorista.id}>
+                  {motorista.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground block">Status</Label>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="pendente">Pendente</SelectItem>
+              <SelectItem value="processando">Processando</SelectItem>
+              <SelectItem value="pago">Pago</SelectItem>
+              <SelectItem value="cancelado">Cancelado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </FilterBar>
 
       <DataTable<PagamentoMotorista>
@@ -502,6 +1152,7 @@ export default function Pagamentos() {
                     setSelectedPagamento(null);
                   }
                 }}
+                disabled={mesesFechados.includes(selectedPeriodo)}
                 className="gap-2"
               >
                 <Edit className="h-4 w-4" />
@@ -509,7 +1160,7 @@ export default function Pagamentos() {
               </Button>
             </div>
           </DialogHeader>
-          <div className="max-h-[calc(90vh-200px)] overflow-y-auto">
+          <div className="max-h-[calc(90vh-200px)] overflow-y-auto px-1">
             {selectedPagamento && (
               <div className="space-y-6">
                 {/* Header */}
@@ -572,37 +1223,113 @@ export default function Pagamentos() {
                   </Card>
                 </div>
 
-                {/* Fretes pagos */}
+                {/* Fretes com Descontos */}
                 {fretesDoPagamento.length > 0 && (
                   <div>
-                    <h3 className="font-semibold mb-3">Fretes Pagos</h3>
-                    <div className="space-y-2">
-                      {fretesDoPagamento.map((frete) => (
-                        <Card key={frete.id} className="p-3">
-                          <div className="flex items-center justify-between gap-4">
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">
-                                {frete.id} • {frete.rota}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {frete.dataFrete} • {frete.toneladas}t
-                              </p>
+                    <h3 className="font-semibold mb-3">Fretes com Detalhamento de Custos</h3>
+                    <div className="space-y-3">
+                      {fretesDoPagamento.map((frete) => {
+                        const custosFrete = custosAdicionaisData.filter((c) => c.freteId === frete.id);
+                        const totalCustos = custosFrete.reduce((sum, c) => sum + c.valor, 0);
+                        const valorLiquido = frete.valorGerado - totalCustos;
+                        return (
+                          <Card key={frete.id} className="p-4 bg-muted/30">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">
+                                    {frete.id} • {frete.rota}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {frete.dataFrete} • {frete.toneladas}t
+                                  </p>
+                                </div>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                  Bruto
+                                </Badge>
+                              </div>
+                              
+                              <div className="bg-background p-3 rounded border border-blue-200 dark:border-blue-900">
+                                <p className="text-sm font-semibold text-blue-600">
+                                  R$ {frete.valorGerado.toLocaleString("pt-BR")}
+                                </p>
+                              </div>
+
+                              {custosFrete.length > 0 && (
+                                <>
+                                  <div className="border-t pt-3 space-y-2">
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2">Descontos (Custos Adicionais):</p>
+                                    {custosFrete.map((custo, idx) => (
+                                      <div key={idx} className="flex items-center justify-between text-sm bg-loss/5 p-2 rounded">
+                                        <span className="text-muted-foreground">• {custo.descricao}</span>
+                                        <span className="font-semibold text-loss">
+                                          -R$ {custo.valor.toLocaleString("pt-BR")}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    <div className="flex items-center justify-between text-xs font-semibold pt-2 border-t border-loss/20">
+                                      <span className="text-loss">Total de Descontos:</span>
+                                      <span className="text-loss">-R$ {totalCustos.toLocaleString("pt-BR")}</span>
+                                    </div>
+                                  </div>
+
+                                  <div className="bg-profit/5 border border-profit/20 p-3 rounded">
+                                    <p className="text-xs text-muted-foreground mb-1">Valor Líquido (após descontos)</p>
+                                    <p className="text-lg font-bold text-profit">
+                                      R$ {valorLiquido.toLocaleString("pt-BR")}
+                                    </p>
+                                  </div>
+                                </>
+                              )}
                             </div>
-                            <div className="text-sm font-semibold text-profit">
-                              R$ {frete.valorGerado.toLocaleString("pt-BR")}
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
+
+                <Separator />
+
+                {/* Resumo de Valores com Descontos */}
+                <div>
+                  <h3 className="font-semibold mb-3">Resumo Financeiro</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                    <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                      <p className="text-xs text-muted-foreground mb-1">Valor Bruto (Fretes)</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        R$ {fretesDoPagamento.reduce((acc, f) => acc + f.valorGerado, 0).toLocaleString("pt-BR")}
+                      </p>
+                    </Card>
+                    <Card className="p-4 bg-loss/10 border-loss/20">
+                      <p className="text-xs text-muted-foreground mb-1">Total de Descontos</p>
+                      <p className="text-2xl font-bold text-loss">
+                        -R$ {fretesDoPagamento
+                          .reduce((acc, frete) => {
+                            return (
+                              acc +
+                              custosAdicionaisData
+                                .filter((c) => c.freteId === frete.id)
+                                .reduce((sum, c) => sum + c.valor, 0)
+                            );
+                          }, 0)
+                          .toLocaleString("pt-BR")}
+                      </p>
+                    </Card>
+                    <Card className="p-4 bg-profit/5 border-profit/20">
+                      <p className="text-xs text-muted-foreground mb-1">Valor Líquido a Pagar</p>
+                      <p className="text-2xl font-bold text-profit">
+                        R$ {(selectedPagamento.valorTotal || 0).toLocaleString("pt-BR")}
+                      </p>
+                    </Card>
+                  </div>
+                </div>
 
                 {/* Value */}
                 <Card className="p-6 bg-gradient-to-br from-profit/10 to-transparent border-profit/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-muted-foreground mb-1">Valor Total</p>
+                      <p className="text-sm text-muted-foreground mb-1">Valor Total a Pagar</p>
                       <p className="text-4xl font-bold text-profit">
                         R$ {selectedPagamento.valorTotal.toLocaleString("pt-BR")}
                       </p>
@@ -678,7 +1405,7 @@ export default function Pagamentos() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto">
+          <div className="space-y-4 max-h-[calc(90vh-200px)] overflow-y-auto px-1">
             {/* Motorista Selection */}
             <div className="space-y-2">
               <Label htmlFor="motorista">Motorista *</Label>
@@ -815,29 +1542,108 @@ export default function Pagamentos() {
 
             <Separator />
 
-            {/* Resumo de Valores */}
+            {/* Resumo de Valores com Descontos */}
             {selectedFretes.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                {/* Detalhamento por Frete */}
                 <div className="space-y-2">
-                  <Label>Valor por Tonelada (Calculado)</Label>
-                  <Card className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
-                    <p className="text-2xl font-bold text-blue-600">
-                      R$ {(editedPagamento.valorUnitarioPorTonelada || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Baseado nos fretes selecionados
-                    </p>
-                  </Card>
+                  <Label className="text-sm font-semibold">Detalhamento de Custos por Frete</Label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {fretesDisponiveis
+                      .filter((f) => selectedFretes.includes(f.id))
+                      .map((frete) => {
+                        const custosFrete = custosAdicionaisData.filter((c) => c.freteId === frete.id);
+                        const totalCustos = custosFrete.reduce((sum, c) => sum + c.valor, 0);
+                        const valorLiquido = frete.valorGerado - totalCustos;
+                        return (
+                          <Card key={frete.id} className="p-3 bg-muted/50">
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold">{frete.id} • {frete.rota}</p>
+                                <div className="text-right">
+                                  <p className="text-xs text-muted-foreground">Bruto</p>
+                                  <p className="text-sm font-semibold text-blue-600">
+                                    R$ {frete.valorGerado.toLocaleString("pt-BR")}
+                                  </p>
+                                </div>
+                              </div>
+                              {custosFrete.length > 0 && (
+                                <div className="border-t pt-2 pl-2 space-y-1">
+                                  {custosFrete.map((custo, idx) => (
+                                    <div key={idx} className="flex items-center justify-between text-xs">
+                                      <span className="text-muted-foreground">- {custo.descricao}</span>
+                                      <span className="text-loss font-semibold">
+                                        -R$ {custo.valor.toLocaleString("pt-BR")}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {totalCustos > 0 && (
+                                <div className="flex items-center justify-between border-t pt-2">
+                                  <span className="text-xs font-semibold text-muted-foreground">Líquido</span>
+                                  <span className="text-sm font-bold text-profit">
+                                    R$ {valorLiquido.toLocaleString("pt-BR")}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </Card>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Resumo Final de Valores */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Valor Bruto</Label>
+                    <Card className="p-3 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                      <p className="text-lg font-bold text-blue-600">
+                        R$ {fretesDisponiveis
+                          .filter((f) => selectedFretes.includes(f.id))
+                          .reduce((acc, f) => acc + f.valorGerado, 0)
+                          .toLocaleString("pt-BR")}
+                      </p>
+                    </Card>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Total de Descontos</Label>
+                    <Card className="p-3 bg-loss/10 border-loss/20">
+                      <p className="text-lg font-bold text-loss">
+                        -R$ {selectedFretes
+                          .reduce((acc, freteId) => {
+                            return (
+                              acc +
+                              custosAdicionaisData
+                                .filter((c) => c.freteId === freteId)
+                                .reduce((sum, c) => sum + c.valor, 0)
+                            );
+                          }, 0)
+                          .toLocaleString("pt-BR")}
+                      </p>
+                    </Card>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Valor a Pagar</Label>
+                    <Card className="p-3 bg-profit/10 border-profit/20">
+                      <p className="text-lg font-bold text-profit">
+                        R$ {(editedPagamento.valorTotal || 0).toLocaleString("pt-BR")}
+                      </p>
+                    </Card>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Valor Total a Pagar</Label>
-                  <Card className="p-3 bg-profit/5 border-profit/20">
-                    <p className="text-2xl font-bold text-profit">
-                      R$ {(editedPagamento.valorTotal || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <Label>Valor por Tonelada (Calculado)</Label>
+                  <Card className="p-3 bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-900">
+                    <p className="text-2xl font-bold text-purple-600">
+                      R$ {(editedPagamento.valorUnitarioPorTonelada || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {editedPagamento.toneladas.toFixed(2)}t × R$ {editedPagamento.valorUnitarioPorTonelada.toFixed(2)}/t
+                      {editedPagamento.toneladas.toFixed(2)}t • Já com descontos de custos
                     </p>
                   </Card>
                 </div>
@@ -849,18 +1655,46 @@ export default function Pagamentos() {
             {/* Data do Pagamento */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="dataPagamento">Data do Pagamento *</Label>
-                <Input
-                  id="dataPagamento"
-                  type="date"
-                  value={editedPagamento.dataPagamento || ""}
-                  onChange={(e) =>
-                    setEditedPagamento({
-                      ...editedPagamento,
-                      dataPagamento: e.target.value,
-                    })
-                  }
-                />
+                <Label>Data do Pagamento *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal gap-2 px-3 h-10"
+                    >
+                      <Calendar className="h-4 w-4 text-primary" />
+                      {editedPagamento.dataPagamento
+                        ? new Date(
+                            editedPagamento.dataPagamento.split("/").reverse().join("-")
+                          ).toLocaleDateString("pt-BR")
+                        : "Selecione a data"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 align-start" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={
+                        editedPagamento.dataPagamento
+                          ? new Date(
+                              editedPagamento.dataPagamento.split("/").reverse().join("-")
+                            )
+                          : undefined
+                      }
+                      onSelect={(date) => {
+                        if (date) {
+                          const formattedDate = date.toLocaleDateString("pt-BR");
+                          setEditedPagamento({
+                            ...editedPagamento,
+                            dataPagamento: formattedDate,
+                          });
+                        }
+                      }}
+                      disabled={(date) =>
+                        date > new Date() || date < new Date("2025-01-01")
+                      }
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="statusPagamento">Status *</Label>

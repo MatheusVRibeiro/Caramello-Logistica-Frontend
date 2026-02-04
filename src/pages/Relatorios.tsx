@@ -94,7 +94,7 @@ interface PagamentoRelatorio {
 
 const fretesData: Frete[] = [
   {
-    id: "#1250",
+    id: "FRETE-2026-001",
     origem: "Fazenda Santa Rita - Marília, SP",
     destino: "Secador Central - Filial 1",
     motorista: "Carlos Silva",
@@ -115,7 +115,7 @@ const fretesData: Frete[] = [
     resultado: 11800,
   },
   {
-    id: "#1249",
+    id: "FRETE-2026-002",
     origem: "Fazenda Boa Esperança - Tupã, SP",
     destino: "Cooperativa Central",
     motorista: "João Oliveira",
@@ -136,7 +136,7 @@ const fretesData: Frete[] = [
     resultado: 7400,
   },
   {
-    id: "#1248",
+    id: "FRETE-2026-003",
     origem: "Fazenda Santa Rita - Marília, SP",
     destino: "Armazém Regional",
     motorista: "Carlos Silva",
@@ -157,7 +157,7 @@ const fretesData: Frete[] = [
     resultado: 10950,
   },
   {
-    id: "#1247",
+    id: "FRETE-2026-004",
     origem: "Fazenda Vale Verde - Assis, SP",
     destino: "Terminal de Grãos",
     motorista: "André Costa",
@@ -178,7 +178,7 @@ const fretesData: Frete[] = [
     resultado: 10375,
   },
   {
-    id: "#1251",
+    id: "FRETE-2026-006",
     origem: "Fazenda Boa Esperança - Tupã, SP",
     destino: "Secador Central - Filial 2",
     motorista: "Carlos Silva",
@@ -230,7 +230,7 @@ const pagamentosData: PagamentoRelatorio[] = [
     valorTotal: 12750,
     metodo: "pix",
     status: "pago",
-    fretes: ["#1250", "#1248"],
+    fretes: ["FRETE-2026-001", "FRETE-2026-003"],
   },
   {
     id: "P002",
@@ -240,7 +240,7 @@ const pagamentosData: PagamentoRelatorio[] = [
     valorTotal: 6750,
     metodo: "transferencia_bancaria",
     status: "processando",
-    fretes: ["#1249"],
+    fretes: ["FRETE-2026-002"],
   },
   {
     id: "P003",
@@ -250,7 +250,7 @@ const pagamentosData: PagamentoRelatorio[] = [
     valorTotal: 8250,
     metodo: "pix",
     status: "pendente",
-    fretes: ["#1247"],
+    fretes: ["FRETE-2026-004"],
   },
 ];
 
@@ -1026,7 +1026,7 @@ export default function Relatorios() {
                 <div className="pt-2 border-t">
                   <p className="text-sm text-muted-foreground">
                     Média por viagem: <span className="font-semibold text-foreground">
-                      R$ {(relatorioMotorista.totalGastos / relatorioMotorista.totalViagens).toLocaleString("pt-BR")}
+                      R$ {(relatorioMotorista.totalGastos / relatorioMotorista.totalFretes).toLocaleString("pt-BR")}
                     </span>
                   </p>
                 </div>
