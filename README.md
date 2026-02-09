@@ -1,58 +1,58 @@
-# Welcome to your Lovable project
+# Bem-vindo ao projeto RN Logistica
 
-## Project info
+## Informacoes do projeto
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**URL**: https://rnlogistica.com
 
-## How can I edit this code?
+## Como posso editar este codigo?
 
-There are several ways of editing your application.
+Existem varias formas de editar sua aplicacao.
 
-**Use Lovable**
+**Use o RN Logistica**
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+Basta visitar o site do projeto RN Logistica e comecar a fazer solicitacoes.
 
-Changes made via Lovable will be committed automatically to this repo.
+Alteracoes feitas via RN Logistica serao commitadas automaticamente neste repositorio.
 
-**Use your preferred IDE**
+**Use seu IDE preferido**
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Se voce quiser trabalhar localmente usando seu proprio IDE, pode clonar este repositorio e enviar alteracoes. As alteracoes enviadas tambem serao refletidas no RN Logistica.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+O unico requisito e ter Node.js e npm instalados - [instale com nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
 
-Follow these steps:
+Siga estes passos:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Passo 1: Clone o repositorio usando a URL Git do projeto.
+git clone <SUA_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Passo 2: Acesse o diretorio do projeto.
+cd <NOME_DO_SEU_PROJETO>
 
-# Step 3: Install the necessary dependencies.
+# Passo 3: Instale as dependencias necessarias.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Passo 4: Inicie o servidor de desenvolvimento com recarregamento automatico e preview instantaneo.
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+**Edite um arquivo diretamente no GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Navegue ate o(s) arquivo(s) desejado(s).
+- Clique no botao "Edit" (icone de lapis) no canto superior direito da visualizacao do arquivo.
+- Faca suas alteracoes e realize o commit.
 
-**Use GitHub Codespaces**
+**Use o GitHub Codespaces**
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- Va para a pagina principal do seu repositorio.
+- Clique no botao "Code" (botao verde) no canto superior direito.
+- Selecione a aba "Codespaces".
+- Clique em "New codespace" para iniciar um novo ambiente Codespace.
+- Edite os arquivos diretamente no Codespace e realize commit e push quando terminar.
 
-## What technologies are used for this project?
+## Quais tecnologias sao usadas neste projeto?
 
-This project is built with:
+Este projeto foi construido com:
 
 - Vite
 - TypeScript
@@ -60,14 +60,14 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
-## How can I deploy this project?
+## Como posso fazer o deploy deste projeto?
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+Basta abrir o RN Logistica e clicar em Share -> Publish.
 
-## Can I connect a custom domain to my Lovable project?
+## Posso conectar um dominio personalizado ao meu projeto RN Logistica?
 
-Yes, you can!
+Sim, voce pode!
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Para conectar um dominio, va em Project > Settings > Domains e clique em Connect Domain.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Leia mais aqui: Configuracao de dominio personalizado.
