@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import * as authService from "@/services/auth";
 
 interface User {
   id: string;
@@ -19,6 +20,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Simulated users for demo
 const DEMO_USERS: Record<string, { password: string; user: User }> = {
+  "admin@gmail.com": {
+    password: "senha123",
+    user: {
+      id: "USR-177084976159115431",
+      name: "Matheusss",
+      email: "admin@gmail.com",
+      role: "admin",
+    },
+  },
   "admin@rnlogistica.com": {
     password: "admin123",
     user: {
@@ -46,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Check for stored session on mount
     const storedUser = localStorage.getItem("rn_logistica_user");
+    
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
@@ -58,16 +69,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
-    
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
+    // Try backend authentication first
+    try {
+      const res = await authService.login(email, password);
+      
+      if (res.success && res.data) {
+        const { user, token } = res.data;
+        
+        setUser(user);
+        localStorage.setItem("rn_logistica_user", JSON.stringify(user));
+        if (token) localStorage.setItem("@RNLogistica:token", token);
+        
+        setIsLoading(false);
+        return true;
+      }
+    } catch (e) {
+      // ignore and fallback to demo users
+    }
+
+    // Fallback to demo users (local development)
     const normalizedEmail = email.toLowerCase().trim();
     const demoUser = DEMO_USERS[normalizedEmail];
 
     if (demoUser && demoUser.password === password) {
       setUser(demoUser.user);
       localStorage.setItem("rn_logistica_user", JSON.stringify(demoUser.user));
+      // Clear any stored token when using demo
+      localStorage.removeItem("@RNLogistica:token");
       setIsLoading(false);
       return true;
     }
@@ -79,6 +108,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem("rn_logistica_user");
+    localStorage.removeItem("@RNLogistica:token");
+    window.location.href = "/login";
   };
 
   return (

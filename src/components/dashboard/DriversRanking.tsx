@@ -2,7 +2,18 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp } from "lucide-react";
 
-const drivers = [
+interface Driver {
+  name: string;
+  revenue: number;
+  trips: number;
+  trend: number;
+}
+
+interface DriversRankingProps {
+  drivers?: Driver[];
+}
+
+const defaultDrivers = [
   { name: "Carlos Silva", revenue: 89500, trips: 24, trend: 12 },
   { name: "João Oliveira", revenue: 78200, trips: 21, trend: 8 },
   { name: "Pedro Santos", revenue: 72100, trips: 19, trend: 5 },
@@ -10,7 +21,8 @@ const drivers = [
   { name: "Lucas Ferreira", revenue: 58400, trips: 15, trend: 3 },
 ];
 
-export function DriversRanking() {
+export function DriversRanking({ drivers: propDrivers }: DriversRankingProps) {
+  const drivers = propDrivers || defaultDrivers;
   return (
     <div className="bg-card rounded-xl border p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">

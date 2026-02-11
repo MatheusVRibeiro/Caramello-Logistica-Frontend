@@ -9,16 +9,27 @@ import {
   Legend,
 } from "recharts";
 
-const data = [
-  { month: "Jan", receita: 185000, custos: 142000 },
-  { month: "Fev", receita: 198000, custos: 155000 },
-  { month: "Mar", receita: 220000, custos: 168000 },
-  { month: "Abr", receita: 245000, custos: 175000 },
-  { month: "Mai", receita: 268000, custos: 190000 },
-  { month: "Jun", receita: 295000, custos: 205000 },
-];
+interface RevenueData {
+  month: string;
+  receita: number;
+  custos: number;
+}
 
-export function RevenueChart() {
+interface RevenueChartProps {
+  data?: RevenueData[];
+}
+
+export function RevenueChart({ data: propData }: RevenueChartProps) {
+  const defaultData = [
+    { month: "Jan", receita: 185000, custos: 142000 },
+    { month: "Fev", receita: 198000, custos: 155000 },
+    { month: "Mar", receita: 220000, custos: 168000 },
+    { month: "Abr", receita: 245000, custos: 175000 },
+    { month: "Mai", receita: 268000, custos: 190000 },
+    { month: "Jun", receita: 295000, custos: 205000 },
+  ];
+
+  const data = propData || defaultData;
   return (
     <div className="bg-card rounded-xl border p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">

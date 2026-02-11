@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { PeriodoFilter } from "@/components/shared/PeriodoFilter";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable } from "@/components/shared/DataTable";
 import { StatCard } from "@/components/shared/StatCard";
@@ -8,8 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import custosService from "@/services/custos";
+import * as fretesService from "@/services/fretes";
+import { usePeriodoFilter } from "@/hooks/usePeriodoFilter";
+import type { Custo, CriarCustoPayload } from "@/types";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -35,94 +44,6 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-interface Custo {
-  id: string;
-  freteId: string;
-  tipo: "combustivel" | "manutencao" | "pedagio" | "outros";
-  descricao: string;
-  valor: number;
-  data: string;
-  comprovante: boolean;
-  motorista: string;
-  caminhao: string;
-  rota: string;
-  observacoes?: string;
-  // Campos específicos de combustível
-  litros?: number;
-  tipoCombustivel?: "gasolina" | "diesel" | "etanol" | "gnv";
-}
-
-const custosData: Custo[] = [
-  {
-    id: "1",
-    freteId: "FRETE-2026-001",
-    tipo: "combustivel",
-    descricao: "Abastecimento completo",
-    valor: 2500,
-    data: "20/01/2025",
-    comprovante: true,
-    motorista: "Carlos Silva",
-    caminhao: "ABC-1234",
-    rota: "São Paulo → Rio de Janeiro",
-    observacoes: "Posto Shell - Rodovia Presidente Dutra KM 180",
-    litros: 450,
-    tipoCombustivel: "diesel",
-  },
-  {
-    id: "2",
-    freteId: "FRETE-2026-001",
-    tipo: "pedagio",
-    descricao: "Via Dutra - trecho completo",
-    valor: 850,
-    data: "20/01/2025",
-    comprovante: true,
-    motorista: "Carlos Silva",
-    caminhao: "ABC-1234",
-    rota: "São Paulo → Rio de Janeiro",
-    observacoes: "9 praças de pedágio no trajeto",
-  },
-  {
-    id: "3",
-    freteId: "FRETE-2026-002",
-    tipo: "manutencao",
-    descricao: "Troca de pneus dianteiros",
-    valor: 3200,
-    data: "18/01/2025",
-    comprovante: true,
-    motorista: "João Oliveira",
-    caminhao: "XYZ-5678",
-    rota: "Curitiba → Florianópolis",
-    observacoes: "Borracharia São José - 2 pneus Pirelli novos",
-  },
-  {
-    id: "4",
-    freteId: "FRETE-2026-002",
-    tipo: "combustivel",
-    descricao: "Abastecimento parcial",
-    valor: 1800,
-    data: "17/01/2025",
-    comprovante: false,
-    motorista: "João Oliveira",
-    caminhao: "XYZ-5678",
-    rota: "Curitiba → Florianópolis",
-    litros: 320,
-    tipoCombustivel: "diesel",
-  },
-  {
-    id: "5",
-    freteId: "FRETE-2026-004",
-    tipo: "outros",
-    descricao: "Estacionamento",
-    valor: 150,
-    data: "15/01/2025",
-    comprovante: true,
-    motorista: "André Costa",
-    caminhao: "DEF-9012",
-    rota: "São Paulo → Rio de Janeiro",
-    observacoes: "Estacionamento durante pernoite - 24h",
-  },
-];
-
 const tipoConfig = {
   combustivel: { label: "Combustível", icon: Fuel, color: "text-warning" },
   manutencao: { label: "Manutenção", icon: Wrench, color: "text-loss" },
@@ -131,6 +52,92 @@ const tipoConfig = {
 };
 
 export default function Custos() {
+  const queryClient = useQueryClient();
+
+  // Query para listar custos
+  const { data: custosResponse, isLoading } = useQuery({
+    queryKey: ["custos"],
+    queryFn: custosService.listarCustos,
+  });
+
+  // Query para listar fretes (vinculo de custos)
+  const { data: fretesResponse } = useQuery({
+    queryKey: ["fretes"],
+    queryFn: fretesService.listarFretes,
+  });
+
+  const custos: Custo[] = custosResponse?.data || [];
+  const fretes = fretesResponse?.data || [];
+
+  // Hook para filtro de período
+  const {
+    tipoVisualizacao,
+    selectedPeriodo,
+    periodosDisponiveis,
+    dadosFiltrados: custosFiltrados,
+    formatPeriodoLabel,
+    setTipoVisualizacao,
+    setSelectedPeriodo,
+  } = usePeriodoFilter({
+    data: custos,
+    getDataField: (c) => c.data,
+  });
+
+  // Mutation para criar custo
+  const createMutation = useMutation({
+    mutationFn: custosService.criarCusto,
+    onSuccess: (response) => {
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: ["custos"] });
+        toast.success("Custo cadastrado com sucesso!");
+        setEditingCusto(null);
+        setIsModalOpen(false);
+      } else {
+        toast.error(response.message || "Erro ao cadastrar custo");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Erro ao cadastrar custo");
+    },
+  });
+
+  // Mutation para atualizar custo
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CriarCustoPayload> }) =>
+      custosService.atualizarCusto(id, data),
+    onSuccess: (response) => {
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: ["custos"] });
+        toast.success("Custo atualizado com sucesso!");
+        setEditingCusto(null);
+        setIsModalOpen(false);
+      } else {
+        toast.error(response.message || "Erro ao atualizar custo");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Erro ao atualizar custo");
+    },
+  });
+
+  // Mutation para deletar custo
+  const deleteMutation = useMutation({
+    mutationFn: custosService.deletarCusto,
+    onSuccess: (response) => {
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: ["custos"] });
+        toast.success("Custo removido com sucesso!");
+        setIsDetailsOpen(false);
+        setSelectedCusto(null);
+      } else {
+        toast.error(response.message || "Erro ao remover custo");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Erro ao remover custo");
+    },
+  });
+
   const [search, setSearch] = useState("");
   const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [motoristaFilter, setMotoristaFilter] = useState<string>("all");
@@ -138,17 +145,124 @@ export default function Custos() {
   const [dateFrom, setDateFrom] = useState<Date>();
   const [dateTo, setDateTo] = useState<Date>();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCusto, setEditingCusto] = useState<Custo | null>(null);
   const [selectedCusto, setSelectedCusto] = useState<Custo | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-  
+
   // Estados do formulário
-  const [formTipo, setFormTipo] = useState<string>("");
-  const [formLitros, setFormLitros] = useState("");
-  const [formTipoCombustivel, setFormTipoCombustivel] = useState("");
+  const [formData, setFormData] = useState<Partial<CriarCustoPayload>>({
+    frete_id: "",
+    tipo: undefined,
+    descricao: "",
+    valor: 0,
+    data: "",
+    comprovante: false,
+    observacoes: "",
+    litros: undefined,
+    tipo_combustivel: undefined,
+  });
 
   const handleRowClick = (custo: Custo) => {
     setSelectedCusto(custo);
     setIsDetailsOpen(true);
+  };
+
+  const handleOpenNewModal = () => {
+    setEditingCusto(null);
+    setFormData({
+      frete_id: "",
+      tipo: undefined,
+      descricao: "",
+      valor: 0,
+      data: "",
+      comprovante: false,
+      observacoes: "",
+      litros: undefined,
+      tipo_combustivel: undefined,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (custo: Custo) => {
+    setEditingCusto(custo);
+    setFormData({
+      frete_id: custo.frete_id,
+      tipo: custo.tipo,
+      descricao: custo.descricao,
+      valor: custo.valor,
+      data: custo.data,
+      comprovante: !!custo.comprovante,
+      observacoes: custo.observacoes || "",
+      litros: custo.litros || undefined,
+      tipo_combustivel: custo.tipo_combustivel || undefined,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!formData.frete_id || !formData.tipo || !formData.valor || !formData.data) {
+      toast.error("Preencha todos os campos obrigatorios!");
+      return;
+    }
+
+    if (formData.tipo === "combustivel" && (!formData.litros || !formData.tipo_combustivel)) {
+      toast.error("Para combustivel, informe litros e tipo de combustivel.");
+      return;
+    }
+
+    // Gerar descrição automática se não houver
+    const descricaoAuto = formData.descricao || 
+      (formData.tipo === "combustivel" ? `Abastecimento - ${formData.tipo_combustivel || 'combustível'}` :
+       formData.tipo === "pedagio" ? "Pedágio" :
+       formData.tipo === "manutencao" ? "Manutenção" :
+       "Outros custos");
+
+    const payload: CriarCustoPayload = {
+      frete_id: formData.frete_id,
+      tipo: formData.tipo,
+      descricao: descricaoAuto,
+      valor: Number(formData.valor),
+      data: formData.data,
+      comprovante: !!formData.comprovante,
+      observacoes: formData.observacoes || undefined,
+      litros: formData.tipo === "combustivel" ? Number(formData.litros) : undefined,
+      tipo_combustivel: formData.tipo === "combustivel" ? formData.tipo_combustivel : undefined,
+    };
+
+    if (editingCusto) {
+      updateMutation.mutate({ id: editingCusto.id, data: payload });
+    } else {
+      createMutation.mutate(payload);
+    }
+  };
+
+  const handleDelete = (custo: Custo) => {
+    if (window.confirm("Tem certeza que deseja deletar este custo?")) {
+      deleteMutation.mutate(custo.id);
+    }
+  };
+
+  const parseCustoDate = (value: string) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+    if (value.includes("/")) {
+      const [dia, mes, ano] = value.split("/");
+      return new Date(Number(ano), Number(mes) - 1, Number(dia));
+    }
+    return null;
+  };
+
+  const formatCustoDate = (value: string) => {
+    const parsed = parseCustoDate(value);
+    return parsed ? format(parsed, "dd/MM/yyyy") : value;
+  };
+
+  const toNumber = (value: number | string | null | undefined) => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined || value === "") return 0;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
   };
 
   // Limpar todos os filtros
@@ -171,12 +285,12 @@ export default function Custos() {
     dateTo !== undefined;
 
   // Lista única de motoristas
-  const motoristas = Array.from(new Set(custosData.map(c => c.motorista)));
+  const motoristas = Array.from(new Set(custos.map(c => c.motorista)));
 
-  const filteredData = custosData.filter((custo) => {
+  const filteredData = custosFiltrados.filter((custo) => {
     // Filtro de busca
     const matchesSearch =
-      custo.freteId.toLowerCase().includes(search.toLowerCase()) ||
+      custo.frete_id.toLowerCase().includes(search.toLowerCase()) ||
       custo.descricao.toLowerCase().includes(search.toLowerCase()) ||
       custo.motorista.toLowerCase().includes(search.toLowerCase());
     
@@ -195,26 +309,28 @@ export default function Custos() {
     // Filtro de data
     let matchesDate = true;
     if (dateFrom || dateTo) {
-      const [dia, mes, ano] = custo.data.split("/");
-      const custoDate = new Date(parseInt(ano), parseInt(mes) - 1, parseInt(dia));
-      
-      if (dateFrom && custoDate < dateFrom) matchesDate = false;
-      if (dateTo && custoDate > dateTo) matchesDate = false;
+      const custoDate = parseCustoDate(custo.data);
+      if (!custoDate) {
+        matchesDate = false;
+      } else {
+        if (dateFrom && custoDate < dateFrom) matchesDate = false;
+        if (dateTo && custoDate > dateTo) matchesDate = false;
+      }
     }
     
     return matchesSearch && matchesTipo && matchesMotorista && matchesComprovante && matchesDate;
   });
 
-  const totalCustos = custosData.reduce((acc, c) => acc + c.valor, 0);
-  const totalCombustivel = custosData
+  const totalCustos = custosFiltrados.reduce((acc, c) => acc + toNumber(c.valor), 0);
+  const totalCombustivel = custosFiltrados
     .filter((c) => c.tipo === "combustivel")
-    .reduce((acc, c) => acc + c.valor, 0);
-  const totalManutencao = custosData
+    .reduce((acc, c) => acc + toNumber(c.valor), 0);
+  const totalManutencao = custosFiltrados
     .filter((c) => c.tipo === "manutencao")
-    .reduce((acc, c) => acc + c.valor, 0);
-  const totalPedagio = custosData
+    .reduce((acc, c) => acc + toNumber(c.valor), 0);
+  const totalPedagio = custosFiltrados
     .filter((c) => c.tipo === "pedagio")
-    .reduce((acc, c) => acc + c.valor, 0);
+    .reduce((acc, c) => acc + toNumber(c.valor), 0);
 
   const columns = [
     {
@@ -234,10 +350,10 @@ export default function Custos() {
       },
     },
     {
-      key: "freteId",
+      key: "frete_id",
       header: "Frete",
       render: (item: Custo) => (
-        <span className="font-mono font-bold text-primary">{item.freteId}</span>
+        <span className="font-mono font-bold text-primary">{item.frete_id}</span>
       ),
     },
     { 
@@ -255,7 +371,7 @@ export default function Custos() {
       header: "Valor",
       render: (item: Custo) => (
         <span className="font-bold text-lg text-loss">
-          R$ {item.valor.toLocaleString("pt-BR")}
+          R$ {toNumber(item.valor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
         </span>
       ),
     },
@@ -263,7 +379,7 @@ export default function Custos() {
       key: "data",
       header: "Data",
       render: (item: Custo) => (
-        <span className="text-muted-foreground">{item.data}</span>
+        <span className="text-muted-foreground">{formatCustoDate(item.data)}</span>
       ),
     },
     {
@@ -295,16 +411,39 @@ export default function Custos() {
     },
   ];
 
+  if (isLoading) {
+    return (
+      <MainLayout title="Custos" subtitle="Gestão de custos operacionais">
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground">Carregando custos...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout title="Custos" subtitle="Gestão de custos operacionais">
       <PageHeader
         title="Custos"
         description="Controle de custos por frete e tipo"
         actions={
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Custo
-          </Button>
+          <div className="flex items-center gap-3">
+            <PeriodoFilter
+              tipoVisualizacao={tipoVisualizacao}
+              selectedPeriodo={selectedPeriodo}
+              periodosDisponiveis={periodosDisponiveis}
+              formatPeriodoLabel={formatPeriodoLabel}
+              onTipoChange={setTipoVisualizacao}
+              onPeriodoChange={setSelectedPeriodo}
+            />
+            <Button onClick={handleOpenNewModal}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Custo
+            </Button>
+          </div>
         }
       />
 
@@ -312,25 +451,25 @@ export default function Custos() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard
           label="Total de Custos"
-          value={`R$ ${totalCustos.toLocaleString("pt-BR")}`}
+          value={`R$ ${totalCustos.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
           variant="loss"
           icon={<DollarSign className="h-5 w-5 text-loss" />}
         />
         <StatCard
           label="Combustível"
-          value={`R$ ${totalCombustivel.toLocaleString("pt-BR")}`}
+          value={`R$ ${totalCombustivel.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
           variant="warning"
           icon={<Fuel className="h-5 w-5 text-warning" />}
         />
         <StatCard
           label="Manutenção"
-          value={`R$ ${totalManutencao.toLocaleString("pt-BR")}`}
+          value={`R$ ${totalManutencao.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
           variant="loss"
           icon={<Wrench className="h-5 w-5 text-loss" />}
         />
         <StatCard
           label="Pedágios"
-          value={`R$ ${totalPedagio.toLocaleString("pt-BR")}`}
+          value={`R$ ${totalPedagio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
           variant="primary"
           icon={<Truck className="h-5 w-5 text-primary" />}
         />
@@ -487,7 +626,10 @@ export default function Custos() {
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                    R$ {filteredData.filter(c => c.tipo === "combustivel").reduce((acc, c) => acc + c.valor, 0).toLocaleString("pt-BR")}
+                    R$ {filteredData
+                      .filter(c => c.tipo === "combustivel")
+                      .reduce((acc, c) => acc + toNumber(c.valor), 0)
+                      .toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -520,7 +662,10 @@ export default function Custos() {
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                    R$ {filteredData.filter(c => c.tipo === "pedagio").reduce((acc, c) => acc + c.valor, 0).toLocaleString("pt-BR")}
+                    R$ {filteredData
+                      .filter(c => c.tipo === "pedagio")
+                      .reduce((acc, c) => acc + toNumber(c.valor), 0)
+                      .toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -553,7 +698,10 @@ export default function Custos() {
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-lg font-bold text-red-600 dark:text-red-400">
-                    R$ {filteredData.filter(c => c.tipo === "manutencao").reduce((acc, c) => acc + c.valor, 0).toLocaleString("pt-BR")}
+                    R$ {filteredData
+                      .filter(c => c.tipo === "manutencao")
+                      .reduce((acc, c) => acc + toNumber(c.valor), 0)
+                      .toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -586,7 +734,10 @@ export default function Custos() {
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-lg font-bold text-slate-600 dark:text-slate-400">
-                    R$ {filteredData.filter(c => c.tipo === "outros").reduce((acc, c) => acc + c.valor, 0).toLocaleString("pt-BR")}
+                    R$ {filteredData
+                      .filter(c => c.tipo === "outros")
+                      .reduce((acc, c) => acc + toNumber(c.valor), 0)
+                      .toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
@@ -673,7 +824,7 @@ export default function Custos() {
                     <span>Frete</span>
                   </div>
                   <p className="font-mono font-bold text-primary text-lg">
-                    {selectedCusto.freteId}
+                    {selectedCusto.frete_id}
                   </p>
                 </div>
 
@@ -683,7 +834,7 @@ export default function Custos() {
                     <CalendarIcon className="h-4 w-4" />
                     <span>Data</span>
                   </div>
-                  <p className="font-semibold text-lg">{selectedCusto.data}</p>
+                  <p className="font-semibold text-lg">{formatCustoDate(selectedCusto.data)}</p>
                 </div>
 
                 {/* Motorista */}
@@ -725,7 +876,7 @@ export default function Custos() {
               </div>
 
               {/* Informações de Combustível */}
-              {selectedCusto.tipo === "combustivel" && (selectedCusto.litros || selectedCusto.tipoCombustivel) && (
+              {selectedCusto.tipo === "combustivel" && (selectedCusto.litros || selectedCusto.tipo_combustivel) && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                     <Fuel className="h-4 w-4" />
@@ -741,14 +892,14 @@ export default function Custos() {
                           </p>
                         </div>
                       )}
-                      {selectedCusto.tipoCombustivel && (
+                      {selectedCusto.tipo_combustivel && (
                         <div>
                           <p className="text-xs text-muted-foreground mb-1">Tipo de Combustível</p>
                           <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                            {selectedCusto.tipoCombustivel === "diesel" && "🚛 Diesel"}
-                            {selectedCusto.tipoCombustivel === "gasolina" && "⛽ Gasolina"}
-                            {selectedCusto.tipoCombustivel === "etanol" && "🌱 Etanol"}
-                            {selectedCusto.tipoCombustivel === "gnv" && "💨 GNV"}
+                            {selectedCusto.tipo_combustivel === "diesel" && "🚛 Diesel"}
+                            {selectedCusto.tipo_combustivel === "gasolina" && "⛽ Gasolina"}
+                            {selectedCusto.tipo_combustivel === "etanol" && "🌱 Etanol"}
+                            {selectedCusto.tipo_combustivel === "gnv" && "💨 GNV"}
                           </p>
                         </div>
                       )}
@@ -780,6 +931,18 @@ export default function Custos() {
               <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
                 Fechar
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsDetailsOpen(false);
+                  handleOpenEditModal(selectedCusto);
+                }}
+              >
+                Editar
+              </Button>
+              <Button variant="destructive" onClick={() => handleDelete(selectedCusto)}>
+                Excluir
+              </Button>
               <Button variant="default">
                 <Upload className="h-4 w-4 mr-2" />
                 Anexar Comprovante
@@ -791,27 +954,43 @@ export default function Custos() {
 
       {/* New Cost Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto px-1">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6">
           <DialogHeader>
-            <DialogTitle>Novo Custo</DialogTitle>
+            <DialogTitle>{editingCusto ? "Editar Custo" : "Novo Custo"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="frete">Frete</Label>
-              <Select>
+              <Label htmlFor="frete_id">Frete *</Label>
+              <Select
+                value={formData.frete_id || ""}
+                onValueChange={(value) => setFormData({ ...formData, frete_id: value })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o frete" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FRETE-2026-001">FRETE-2026-001 - SP para RJ</SelectItem>
-                  <SelectItem value="FRETE-2026-002">FRETE-2026-002 - PR para SC</SelectItem>
-                  <SelectItem value="FRETE-2026-003">FRETE-2026-003 - MG para DF</SelectItem>
+                  {fretes.length === 0 ? (
+                    <SelectItem value="" disabled>
+                      Nenhum frete disponivel
+                    </SelectItem>
+                  ) : (
+                    fretes.map((frete) => (
+                      <SelectItem key={frete.id} value={frete.id}>
+                        {frete.id} - {frete.destino}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="tipo">Tipo de Custo</Label>
-              <Select value={formTipo} onValueChange={setFormTipo}>
+              <Label htmlFor="tipo">Tipo de Custo *</Label>
+              <Select
+                value={formData.tipo || ""}
+                onValueChange={(value) =>
+                  setFormData({ ...formData, tipo: value as Custo["tipo"] })
+                }
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o tipo" />
                 </SelectTrigger>
@@ -825,7 +1004,7 @@ export default function Custos() {
             </div>
             
             {/* Campos específicos para Combustível */}
-            {formTipo === "combustivel" && (
+            {formData.tipo === "combustivel" && (
               <Card className="p-4 bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-3">
@@ -840,14 +1019,19 @@ export default function Custos() {
                         id="litros" 
                         type="number" 
                         placeholder="Ex: 150" 
-                        value={formLitros}
-                        onChange={(e) => setFormLitros(e.target.value)}
+                        value={formData.litros ?? ""}
+                        onChange={(e) => setFormData({ ...formData, litros: Number(e.target.value) })}
                         step="0.01"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="tipoCombustivel">Tipo de Combustível *</Label>
-                      <Select value={formTipoCombustivel} onValueChange={setFormTipoCombustivel}>
+                      <Label htmlFor="tipo_combustivel">Tipo de Combustível *</Label>
+                      <Select
+                        value={formData.tipo_combustivel || ""}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, tipo_combustivel: value as Custo["tipo_combustivel"] })
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione" />
                         </SelectTrigger>
@@ -861,15 +1045,15 @@ export default function Custos() {
                     </div>
                   </div>
                   
-                  {formLitros && formTipoCombustivel && (
+                  {formData.litros && formData.tipo_combustivel && (
                     <Card className="p-3 bg-white dark:bg-slate-950">
                       <p className="text-sm text-muted-foreground">
-                        <span className="font-semibold text-foreground">{formLitros}L</span> de{' '}
+                        <span className="font-semibold text-foreground">{formData.litros}L</span> de{' '}
                         <span className="font-semibold text-foreground">
-                          {formTipoCombustivel === "diesel" && "Diesel"}
-                          {formTipoCombustivel === "gasolina" && "Gasolina"}
-                          {formTipoCombustivel === "etanol" && "Etanol"}
-                          {formTipoCombustivel === "gnv" && "GNV"}
+                          {formData.tipo_combustivel === "diesel" && "Diesel"}
+                          {formData.tipo_combustivel === "gasolina" && "Gasolina"}
+                          {formData.tipo_combustivel === "etanol" && "Etanol"}
+                          {formData.tipo_combustivel === "gnv" && "GNV"}
                         </span>
                       </p>
                     </Card>
@@ -877,30 +1061,77 @@ export default function Custos() {
                 </div>
               </Card>
             )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="descricao">Descrição</Label>
-              <Input id="descricao" placeholder="Descreva o custo" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="valor">Valor *</Label>
+                <Input
+                  id="valor"
+                  type="number"
+                  placeholder="0,00"
+                  step="0.01"
+                  value={formData.valor ?? 0}
+                  onChange={(e) => setFormData({ ...formData, valor: Number(e.target.value) })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="data">Data *</Label>
+                <Input
+                  id="data"
+                  type="date"
+                  value={formData.data || ""}
+                  onChange={(e) => setFormData({ ...formData, data: e.target.value })}
+                />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="valor">Valor</Label>
-              <Input id="valor" type="number" placeholder="0,00" step="0.01" />
+              <Label htmlFor="observacoes">Observações</Label>
+              <Textarea
+                id="observacoes"
+                placeholder="Observações adicionais"
+                value={formData.observacoes || ""}
+                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label>Comprovante</Label>
-              <div className="border-2 border-dashed border-muted rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
-                <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">
-                  Clique ou arraste para anexar
-                </p>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="comprovante"
+                  checked={!!formData.comprovante}
+                  onCheckedChange={(checked) =>
+                    setFormData({ ...formData, comprovante: checked === true })
+                  }
+                />
+                <Label htmlFor="comprovante" className="font-normal cursor-pointer">
+                  {formData.comprovante ? (
+                    <Badge variant="success" className="text-xs">
+                      <FileCheck className="h-3 w-3 mr-1 inline" /> Anexado
+                    </Badge>
+                  ) : (
+                    <Badge variant="neutral" className="text-xs">
+                      Comprovante Pendente
+                    </Badge>
+                  )}
+                </Label>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsModalOpen(false);
+                setEditingCusto(null);
+              }}
+            >
               Cancelar
             </Button>
-            <Button onClick={() => setIsModalOpen(false)}>Salvar</Button>
+            <Button
+              onClick={handleSave}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {editingCusto ? "Salvar Alterações" : "Cadastrar Custo"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,11 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { PeriodoFilter } from "@/components/shared/PeriodoFilter";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -14,131 +23,131 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Package, Weight, DollarSign, Edit, MapPin, Save, X, Info, TrendingUp, Calendar, User, Sparkles, BarChart3, FileDown, CheckCircle2 } from "lucide-react";
+import { Plus, Package, Weight, DollarSign, Edit, MapPin, Save, X, Info, TrendingUp, TrendingDown, Calendar, User, Sparkles, BarChart3, FileDown, CheckCircle2, Truck, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
-
-interface ProducaoFazenda {
-  id: string;
-  fazenda: string;
-  localizacao: string;
-  proprietario: string;
-  mercadoria: string;
-  variedade: string;
-  totalSacasCarregadas: number;  // Começa em 0, aumenta conforme carrega
-  totalToneladas: number;          // Começa em 0, aumenta conforme carrega
-  faturamentoTotal: number;        // Começa em 0, aumenta conforme carrega
-  precoPorTonelada: number;        // Preço base por tonelada
-  pesoMedioSaca: number;           // Peso médio em kg
-  safra: string;
-  ultimoFrete: string;             // Data do último frete
-  colheitaFinalizada?: boolean;    // Marca se a colheita foi finalizada
-}
-
-const producaoFazendasData: ProducaoFazenda[] = [
-  {
-    id: "1",
-    fazenda: "Fazenda Santa Esperança",
-    localizacao: "Marília, SP",
-    proprietario: "João Silva",
-    mercadoria: "Amendoim em Casca",
-    variedade: "Verde",
-    totalSacasCarregadas: 0,
-    totalToneladas: 0,
-    faturamentoTotal: 0,
-    precoPorTonelada: 600,
-    pesoMedioSaca: 25,
-    safra: "2024/2025",
-    ultimoFrete: "-",
-    colheitaFinalizada: false,
-  },
-  {
-    id: "2",
-    fazenda: "Fazenda Boa Vista",
-    localizacao: "Tupã, SP",
-    proprietario: "Maria Santos",
-    mercadoria: "Amendoim em Casca",
-    variedade: "Vermelho",
-    totalSacasCarregadas: 0,
-    totalToneladas: 0,
-    faturamentoTotal: 0,
-    precoPorTonelada: 720,
-    pesoMedioSaca: 25,
-    safra: "2024/2025",
-    ultimoFrete: "-",
-    colheitaFinalizada: false,
-  },
-  {
-    id: "3",
-    fazenda: "Fazenda São João",
-    localizacao: "Jaboticabal, SP",
-    proprietario: "Pedro Costa",
-    mercadoria: "Amendoim Premium",
-    variedade: "Selecionado",
-    totalSacasCarregadas: 0,
-    totalToneladas: 0,
-    faturamentoTotal: 0,
-    precoPorTonelada: 1000,
-    pesoMedioSaca: 25,
-    safra: "2024/2025",
-    ultimoFrete: "-",
-    colheitaFinalizada: false,
-  },
-  {
-    id: "4",
-    fazenda: "Fazenda Vale Verde",
-    localizacao: "Ribeirão Preto, SP",
-    proprietario: "Lucas Oliveira",
-    mercadoria: "Amendoim Descascado",
-    variedade: "Tipo 1",
-    totalSacasCarregadas: 0,
-    totalToneladas: 0,
-    faturamentoTotal: 0,
-    precoPorTonelada: 800,
-    pesoMedioSaca: 25,
-    safra: "2024/2025",
-    ultimoFrete: "-",
-    colheitaFinalizada: false,
-  },
-  {
-    id: "5",
-    fazenda: "Fazenda Recanto",
-    localizacao: "Barretos, SP",
-    proprietario: "André Ribeiro",
-    mercadoria: "Amendoim em Casca",
-    variedade: "Runner",
-    totalSacasCarregadas: 0,
-    totalToneladas: 0,
-    faturamentoTotal: 0,
-    precoPorTonelada: 640,
-    pesoMedioSaca: 25,
-    safra: "2024/2025",
-    ultimoFrete: "-",
-    colheitaFinalizada: false,
-  },
-];
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import fazendasService from "@/services/fazendas";
+import { usePeriodoFilter } from "@/hooks/usePeriodoFilter";
+import { formatarInputMoeda, desformatarMoeda } from "@/utils/formatters";
+import type { Fazenda, CriarFazendaPayload } from "@/types";
 
 export default function Fazendas() {
+  const queryClient = useQueryClient();
+
+  // Gerar opções de safra dinamicamente (últimos 5 anos e próximos 3)
+  const gerarOpcoesSafra = () => {
+    const anoAtual = new Date().getFullYear();
+    const opcoes: string[] = [];
+    for (let i = -5; i <= 3; i++) {
+      const ano = anoAtual + i;
+      opcoes.push(`${ano}/${ano + 1}`);
+    }
+    return opcoes.reverse(); // Mais recentes primeiro
+  };
+
+  const opcoesSafra = gerarOpcoesSafra();
+
+  // Query para listar fazendas
+  const { data: fazendasResponse, isLoading } = useQuery({
+    queryKey: ["fazendas"],
+    queryFn: fazendasService.listarFazendas,
+  });
+
+  const fazendas: Fazenda[] = fazendasResponse?.data || [];
+
+  // Hook para filtro de período (usa created_at ou data_atualizacao)
+  const {
+    tipoVisualizacao,
+    selectedPeriodo,
+    periodosDisponiveis,
+    dadosFiltrados: fazendasFiltradas,
+    formatPeriodoLabel,
+    setTipoVisualizacao,
+    setSelectedPeriodo,
+  } = usePeriodoFilter({
+    data: fazendas,
+    getDataField: (f) => f.updated_at || f.created_at || new Date().toISOString(),
+  });
+
+  const toNumber = (value: number | string | null | undefined) => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined || value === "") return 0;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  // Mutation para criar fazenda
+  const createMutation = useMutation({
+    mutationFn: fazendasService.criarFazenda,
+    onSuccess: (response) => {
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: ["fazendas"] });
+        toast.success("Fazenda cadastrada com sucesso!");
+        setIsModalOpen(false);
+      } else {
+        toast.error(response.message || "Erro ao cadastrar fazenda");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Erro ao cadastrar fazenda");
+    },
+  });
+
+  // Mutation para atualizar fazenda
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CriarFazendaPayload> }) =>
+      fazendasService.atualizarFazenda(id, data),
+    onSuccess: (response) => {
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: ["fazendas"] });
+        toast.success("Fazenda atualizada com sucesso!");
+        setIsModalOpen(false);
+      } else {
+        toast.error(response.message || "Erro ao atualizar fazenda");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Erro ao atualizar fazenda");
+    },
+  });
+
+  // Mutation para deletar fazenda
+  const deleteMutation = useMutation({
+    mutationFn: fazendasService.deletarFazenda,
+    onSuccess: (response) => {
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: ["fazendas"] });
+        toast.success("Fazenda removida com sucesso!");
+      } else {
+        toast.error(response.message || "Erro ao remover fazenda");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Erro ao remover fazenda");
+    },
+  });
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [selectedProducao, setSelectedProducao] = useState<ProducaoFazenda | null>(null);
-  const [producaoState, setProducaoState] = useState<ProducaoFazenda[]>(producaoFazendasData);
-  const [newProducao, setNewProducao] = useState<Partial<ProducaoFazenda>>({
+  const [selectedProducao, setSelectedProducao] = useState<Fazenda | null>(null);
+  const [newProducao, setNewProducao] = useState<Partial<Fazenda>>({
     fazenda: "",
     localizacao: "",
     proprietario: "",
     mercadoria: "",
     variedade: "",
-    totalSacasCarregadas: 0,
-    totalToneladas: 0,
-    faturamentoTotal: 0,
-    precoPorTonelada: 0,
-    pesoMedioSaca: 25,
+    total_sacas_carregadas: 0,
+    total_toneladas: 0,
+    faturamento_total: 0,
+    preco_por_tonelada: 0,
+    peso_medio_saca: 25,
     safra: "2024/2025",
-    colheitaFinalizada: false,
+    colheita_finalizada: false,
   });
 
   const handleOpenNewModal = () => {
@@ -148,19 +157,19 @@ export default function Fazendas() {
       proprietario: "",
       mercadoria: "",
       variedade: "",
-      totalSacasCarregadas: 0,
-      totalToneladas: 0,
-      faturamentoTotal: 0,
-      precoPorTonelada: 0,
-      pesoMedioSaca: 25,
+      total_sacas_carregadas: 0,
+      total_toneladas: 0,
+      faturamento_total: 0,
+      preco_por_tonelada: 0,
+      peso_medio_saca: 25,
       safra: "2024/2025",
-      colheitaFinalizada: false,
+      colheita_finalizada: false,
     });
     setIsEditing(false);
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (producao: ProducaoFazenda) => {
+  const handleOpenEditModal = (producao: Fazenda) => {
     setNewProducao(producao);
     setIsEditing(true);
     setSelectedProducao(null);
@@ -173,90 +182,82 @@ export default function Fazendas() {
       return;
     }
 
-    if (isEditing) {
-      setProducaoState(prev => prev.map(p => 
-        p.id === newProducao.id ? { ...p, ...newProducao } as ProducaoFazenda : p
-      ));
-      toast.success("Produção atualizada com sucesso!");
+    if (isEditing && newProducao.id) {
+      updateMutation.mutate({ id: newProducao.id, data: newProducao });
     } else {
-      const novaProducao: ProducaoFazenda = {
-        id: `${Math.floor(Math.random() * 10000)}`,
+      const payload: CriarFazendaPayload = {
         fazenda: newProducao.fazenda!,
         localizacao: newProducao.localizacao || "",
         proprietario: newProducao.proprietario || "",
         mercadoria: newProducao.mercadoria!,
-        variedade: newProducao.variedade!,
-        totalSacasCarregadas: 0,
-        totalToneladas: 0,
-        faturamentoTotal: 0,
-        precoPorTonelada: newProducao.precoPorTonelada!,
-        pesoMedioSaca: newProducao.pesoMedioSaca || 25,
+        variedade: newProducao.variedade || "",
+        preco_por_tonelada: newProducao.preco_por_tonelada || 0,
+        peso_medio_saca: newProducao.peso_medio_saca || 25,
         safra: newProducao.safra || "2024/2025",
-        ultimoFrete: "-",
-        colheitaFinalizada: false,
+        total_sacas_carregadas: 0,
+        total_toneladas: 0,
+        faturamento_total: 0,
+        ultimo_frete: "-",
+        colheita_finalizada: false,
       };
-      setProducaoState([novaProducao, ...producaoState]);
-      toast.success("Fazenda cadastrada com sucesso!");
+      createMutation.mutate(payload);
     }
-
-    setIsModalOpen(false);
   };
 
-  const filteredData = producaoState.filter(
+  const filteredData = fazendas.filter(
     (p) =>
       p.fazenda.toLowerCase().includes(search.toLowerCase()) ||
       p.mercadoria.toLowerCase().includes(search.toLowerCase()) ||
-      p.variedade.toLowerCase().includes(search.toLowerCase()) ||
-      p.proprietario.toLowerCase().includes(search.toLowerCase())
+      (p.variedade?.toLowerCase() || "").includes(search.toLowerCase()) ||
+      (p.proprietario?.toLowerCase() || "").includes(search.toLowerCase())
   );
 
-  const fazendasAtivas = filteredData.filter((p) => !p.colheitaFinalizada);
-  const fazendasFinalizadas = filteredData.filter((p) => p.colheitaFinalizada);
+  const fazendasAtivas = filteredData.filter((p) => !p.colheita_finalizada);
+  const fazendasFinalizadas = filteredData.filter((p) => p.colheita_finalizada);
 
   // Função para adicionar produção quando um frete é carregado
-  (window as any).adicionarProducao = (
-    fazendaId: string, 
-    quantidadeSacas: number, 
-    valorFrete: number, 
-    toneladas: number
-  ) => {
-    setProducaoState(prev => prev.map(p => {
-      if (p.id === fazendaId) {
-        return {
-          ...p,
-          totalSacasCarregadas: p.totalSacasCarregadas + quantidadeSacas,
-          totalToneladas: p.totalToneladas + toneladas,
-          faturamentoTotal: p.faturamentoTotal + valorFrete,
-          ultimoFrete: new Date().toLocaleDateString("pt-BR"),
-        };
+  useEffect(() => {
+    (window as any).adicionarProducao = (
+      fazendaId: string,
+      quantidadeSacas: number,
+      valorFrete: number,
+      toneladas: number
+    ) => {
+      const fazenda = fazendas.find((f) => f.id === fazendaId);
+      if (fazenda) {
+        updateMutation.mutate({
+          id: fazendaId,
+          data: {
+            total_sacas_carregadas: (fazenda.total_sacas_carregadas || 0) + quantidadeSacas,
+            total_toneladas: (fazenda.total_toneladas || 0) + toneladas,
+            faturamento_total: (fazenda.faturamento_total || 0) + valorFrete,
+            ultimo_frete: new Date().toLocaleDateString("pt-BR"),
+          },
+        });
       }
-      return p;
-    }));
-  };
+    };
 
-  // Expor fazendas para uso em outras páginas
-  (window as any).getProducaoFazendas = () => producaoState;
+    // Expor fazendas para uso em outras páginas
+    (window as any).getProducaoFazendas = () => fazendas;
+  }, [fazendas, updateMutation]);
 
   const handleToggleColheitaFinalizada = (fazendaId: string) => {
-    let statusAtual = false;
-    setProducaoState((prev) => {
-      const fazenda = prev.find((p) => p.id === fazendaId);
-      statusAtual = !!fazenda?.colheitaFinalizada;
-      return prev.map((p) =>
-        p.id === fazendaId
-          ? { ...p, colheitaFinalizada: !p.colheitaFinalizada }
-          : p
+    const fazenda = fazendas.find((p) => p.id === fazendaId);
+    if (fazenda) {
+      const statusAtual = !!fazenda.colheita_finalizada;
+      updateMutation.mutate({
+        id: fazendaId,
+        data: { colheita_finalizada: !statusAtual },
+      });
+      toast.success(
+        statusAtual
+          ? "Colheita reaberta para atualização."
+          : "Colheita finalizada com sucesso!"
       );
-    });
-
-    toast.success(
-      statusAtual
-        ? "Colheita reaberta para atualização."
-        : "Colheita finalizada com sucesso!"
-    );
+    }
   };
 
-  const handleExportarPDF = (fazenda: ProducaoFazenda) => {
+  const handleExportarPDF = (fazenda: Fazenda) => {
     const doc = new jsPDF();
 
     // ==================== CABEÇALHO ====================
@@ -304,8 +305,8 @@ export default function Fazendas() {
     doc.text(fazenda.safra, 32, 66);
 
     // Status em badge
-    const statusLabel = fazenda.colheitaFinalizada ? "COLHEITA FINALIZADA" : "COLHEITA EM ANDAMENTO";
-    doc.setFillColor(fazenda.colheitaFinalizada ? 37 : 59, fazenda.colheitaFinalizada ? 99 : 130, fazenda.colheitaFinalizada ? 235 : 246);
+    const statusLabel = fazenda.colheita_finalizada ? "COLHEITA FINALIZADA" : "COLHEITA EM ANDAMENTO";
+    doc.setFillColor(fazenda.colheita_finalizada ? 37 : 59, fazenda.colheita_finalizada ? 99 : 130, fazenda.colheita_finalizada ? 235 : 246);
     doc.roundedRect(145, 40, 50, 9, 2, 2, "F");
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
@@ -315,9 +316,9 @@ export default function Fazendas() {
     doc.setTextColor(0, 0, 0);
 
     // ==================== RESUMO ====================
-    const precoPorSaca = (fazenda.precoPorTonelada * fazenda.pesoMedioSaca) / 1000;
-    const faturamentoPorTon = fazenda.totalToneladas > 0
-      ? fazenda.faturamentoTotal / fazenda.totalToneladas
+    const precoPorSaca = (fazenda.preco_por_tonelada * fazenda.peso_medio_saca) / 1000;
+    const faturamentoPorTon = fazenda.total_toneladas > 0
+      ? fazenda.faturamento_total / fazenda.total_toneladas
       : 0;
 
     let y = 75;
@@ -346,21 +347,21 @@ export default function Fazendas() {
     card(
       14,
       "Sacas carregadas",
-      fazenda.totalSacasCarregadas.toLocaleString("pt-BR"),
+      fazenda.total_sacas_carregadas.toLocaleString("pt-BR"),
       [37, 99, 235],
       [239, 246, 255]
     );
     card(
       76,
       "Toneladas",
-      fazenda.totalToneladas.toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
+      fazenda.total_toneladas.toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
       [30, 64, 175],
       [224, 231, 255]
     );
     card(
       138,
       "Faturamento",
-      `R$ ${fazenda.faturamentoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      `R$ ${fazenda.faturamento_total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
       [22, 163, 74],
       [220, 252, 231]
     );
@@ -385,12 +386,12 @@ export default function Fazendas() {
     doc.setFont("helvetica", "bold");
     doc.text("Último frete:", 18, y);
     doc.setFont("helvetica", "normal");
-    doc.text(fazenda.ultimoFrete, 50, y);
+    doc.text(fazenda.ultimo_frete, 50, y);
     y += 6;
     doc.setFont("helvetica", "bold");
     doc.text("Preço por tonelada:", 18, y);
     doc.setFont("helvetica", "normal");
-    doc.text(`R$ ${fazenda.precoPorTonelada.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 60, y);
+    doc.text(`R$ ${fazenda.preco_por_tonelada.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 60, y);
     y += 6;
     doc.setFont("helvetica", "bold");
     doc.text("Preço por saca:", 18, y);
@@ -400,7 +401,7 @@ export default function Fazendas() {
     doc.setFont("helvetica", "bold");
     doc.text("Peso médio por saca:", 18, y);
     doc.setFont("helvetica", "normal");
-    doc.text(`${fazenda.pesoMedioSaca}kg`, 64, y);
+    doc.text(`${fazenda.peso_medio_saca}kg`, 64, y);
     y += 6;
     doc.setFont("helvetica", "bold");
     doc.text("Faturamento por tonelada:", 18, y);
@@ -431,14 +432,32 @@ export default function Fazendas() {
       title="Fazendas"
       subtitle="Gestão de produção por fazenda"
     >
+      {isLoading ? (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground">Carregando fazendas...</p>
+          </div>
+        </div>
+      ) : (
       <div className="space-y-6">
         <PageHeader
           title="Produção de Fazendas"
           actions={
-            <Button onClick={handleOpenNewModal} size="lg" className="shadow-lg">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Fazenda
-            </Button>
+            <div className="flex items-center gap-3">
+              <PeriodoFilter
+                tipoVisualizacao={tipoVisualizacao}
+                selectedPeriodo={selectedPeriodo}
+                periodosDisponiveis={periodosDisponiveis}
+                formatPeriodoLabel={formatPeriodoLabel}
+                onTipoChange={setTipoVisualizacao}
+                onPeriodoChange={setSelectedPeriodo}
+              />
+              <Button onClick={handleOpenNewModal} size="lg" className="shadow-lg">
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Fazenda
+              </Button>
+            </div>
           }
         />
 
@@ -448,8 +467,8 @@ export default function Fazendas() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Total de Fazendas</p>
-                  <p className="text-3xl font-bold tracking-tight">{producaoState.length}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Fazendas no período</p>
+                  <p className="text-3xl font-bold tracking-tight">{fazendasFiltradas.length}</p>
                   <p className="text-xs text-green-600 flex items-center gap-1">
                     <Sparkles className="h-3 w-3" />
                     Produtoras ativas
@@ -468,7 +487,9 @@ export default function Fazendas() {
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Sacas Carregadas</p>
                   <p className="text-3xl font-bold tracking-tight">
-                    {producaoState.reduce((acc, p) => acc + p.totalSacasCarregadas, 0).toLocaleString("pt-BR")}
+                    {fazendas
+                      .reduce((acc, p) => acc + toNumber(p.total_sacas_carregadas), 0)
+                      .toLocaleString("pt-BR")}
                   </p>
                   <p className="text-xs text-blue-600 flex items-center gap-1">
                     <TrendingUp className="h-3 w-3" />
@@ -488,7 +509,9 @@ export default function Fazendas() {
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Toneladas</p>
                   <p className="text-3xl font-bold tracking-tight">
-                    {producaoState.reduce((acc, p) => acc + p.totalToneladas, 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                    {fazendas
+                      .reduce((acc, p) => acc + toNumber(p.total_toneladas), 0)
+                      .toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
                   </p>
                   <p className="text-xs text-purple-600 flex items-center gap-1">
                     <Weight className="h-3 w-3" />
@@ -508,7 +531,9 @@ export default function Fazendas() {
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">Faturamento Total</p>
                   <p className="text-3xl font-bold tracking-tight text-green-600 dark:text-green-500">
-                    R$ {(producaoState.reduce((acc, p) => acc + p.faturamentoTotal, 0) / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}k
+                    R$ {fazendasFiltradas
+                      .reduce((acc, p) => acc + toNumber(p.faturamento_total), 0)
+                      .toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <p className="text-xs text-green-600 dark:text-green-500 flex items-center gap-1">
                     <DollarSign className="h-3 w-3" />
@@ -540,8 +565,9 @@ export default function Fazendas() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {fazendasAtivas.map((fazenda) => {
-            const precoPorSaca = (fazenda.precoPorTonelada * fazenda.pesoMedioSaca) / 1000;
-            const hasProducao = fazenda.totalSacasCarregadas > 0;
+            const precoPorSaca =
+              (toNumber(fazenda.preco_por_tonelada) * toNumber(fazenda.peso_medio_saca)) / 1000;
+            const hasProducao = toNumber(fazenda.total_sacas_carregadas) > 0;
             
             return (
               <Card 
@@ -567,7 +593,7 @@ export default function Fazendas() {
                         </div>
                       </div>
                     </div>
-                    {fazenda.colheitaFinalizada ? (
+                    {fazenda.colheita_finalizada ? (
                       <Badge className="bg-emerald-600 text-white shadow-sm">
                         <CheckCircle2 className="h-3 w-3 mr-1" />
                         Finalizada
@@ -612,7 +638,7 @@ export default function Fazendas() {
                         Sacas
                       </p>
                       <p className="text-2xl font-bold text-blue-600">
-                        {fazenda.totalSacasCarregadas.toLocaleString("pt-BR")}
+                        {toNumber(fazenda.total_sacas_carregadas).toLocaleString("pt-BR")}
                       </p>
                     </div>
                     <div className="space-y-1">
@@ -621,7 +647,7 @@ export default function Fazendas() {
                         Toneladas
                       </p>
                       <p className="text-2xl font-bold text-purple-600">
-                        {fazenda.totalToneladas.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                        {toNumber(fazenda.total_toneladas).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
                       </p>
                     </div>
                   </div>
@@ -635,12 +661,12 @@ export default function Fazendas() {
                       </span>
                     </div>
                     <p className="text-2xl font-bold text-green-600 dark:text-green-500">
-                      R$ {fazenda.faturamentoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      R$ {toNumber(fazenda.faturamento_total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                     </p>
                     <div className="mt-2 pt-2 border-t border-green-200/50 dark:border-green-800/50 space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">Preço/ton:</span>
-                        <span className="font-semibold">R$ {fazenda.precoPorTonelada.toLocaleString("pt-BR")}</span>
+                        <span className="font-semibold">R$ {toNumber(fazenda.preco_por_tonelada).toLocaleString("pt-BR")}</span>
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">Preço/saca:</span>
@@ -656,7 +682,12 @@ export default function Fazendas() {
                       Safra {fazenda.safra}
                     </div>
                     <div className="flex items-center gap-1">
-                      Último frete: <span className="font-medium">{fazenda.ultimoFrete}</span>
+                      Último frete: <span className="font-medium">
+                        {fazenda.ultimo_frete_data 
+                          ? format(new Date(fazenda.ultimo_frete_data), "dd/MM/yyyy", { locale: ptBR })
+                          : fazenda.ultimo_frete || "-"
+                        }
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -673,8 +704,9 @@ export default function Fazendas() {
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {fazendasFinalizadas.map((fazenda) => {
-                const precoPorSaca = (fazenda.precoPorTonelada * fazenda.pesoMedioSaca) / 1000;
-                const hasProducao = fazenda.totalSacasCarregadas > 0;
+                const precoPorSaca =
+                  (toNumber(fazenda.preco_por_tonelada) * toNumber(fazenda.peso_medio_saca)) / 1000;
+                const hasProducao = toNumber(fazenda.total_sacas_carregadas) > 0;
 
                 return (
                   <Card
@@ -700,7 +732,7 @@ export default function Fazendas() {
                             </div>
                           </div>
                         </div>
-                        {fazenda.colheitaFinalizada ? (
+                        {fazenda.colheita_finalizada ? (
                           <Badge className="bg-emerald-600 text-white shadow-sm">
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             Finalizada
@@ -743,7 +775,7 @@ export default function Fazendas() {
                             Sacas
                           </p>
                           <p className="text-2xl font-bold text-blue-600">
-                            {fazenda.totalSacasCarregadas.toLocaleString("pt-BR")}
+                            {toNumber(fazenda.total_sacas_carregadas).toLocaleString("pt-BR")}
                           </p>
                         </div>
                         <div className="space-y-1">
@@ -752,7 +784,7 @@ export default function Fazendas() {
                             Toneladas
                           </p>
                           <p className="text-2xl font-bold text-purple-600">
-                            {fazenda.totalToneladas.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                            {toNumber(fazenda.total_toneladas).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
                           </p>
                         </div>
                       </div>
@@ -765,12 +797,12 @@ export default function Fazendas() {
                           </span>
                         </div>
                         <p className="text-2xl font-bold text-green-600 dark:text-green-500">
-                          R$ {fazenda.faturamentoTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          R$ {toNumber(fazenda.faturamento_total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                         </p>
                         <div className="mt-2 pt-2 border-t border-green-200/50 dark:border-green-800/50 space-y-1">
                           <div className="flex justify-between text-xs">
                             <span className="text-muted-foreground">Preço/ton:</span>
-                            <span className="font-semibold">R$ {fazenda.precoPorTonelada.toLocaleString("pt-BR")}</span>
+                            <span className="font-semibold">R$ {toNumber(fazenda.preco_por_tonelada).toLocaleString("pt-BR")}</span>
                           </div>
                           <div className="flex justify-between text-xs">
                             <span className="text-muted-foreground">Preço/saca:</span>
@@ -785,7 +817,12 @@ export default function Fazendas() {
                           Safra {fazenda.safra}
                         </div>
                         <div className="flex items-center gap-1">
-                          Último frete: <span className="font-medium">{fazenda.ultimoFrete}</span>
+                          Último frete: <span className="font-medium">
+                            {fazenda.ultimo_frete_data 
+                              ? format(new Date(fazenda.ultimo_frete_data), "dd/MM/yyyy", { locale: ptBR })
+                              : fazenda.ultimo_frete || "-"
+                            }
+                          </span>
                         </div>
                       </div>
                     </CardContent>
@@ -817,6 +854,7 @@ export default function Fazendas() {
           </Card>
         )}
       </div>
+      )}
 
       {/* Modal de Nova/Editar Fazenda */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -898,24 +936,39 @@ export default function Fazendas() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="safra">Safra</Label>
-                  <Input
-                    id="safra"
-                    placeholder="Ex: 2024/2025"
+                  <Label htmlFor="safra">Safra *</Label>
+                  <Select
                     value={newProducao.safra}
-                    onChange={(e) => setNewProducao({ ...newProducao, safra: e.target.value })}
-                  />
+                    onValueChange={(value) => setNewProducao({ ...newProducao, safra: value })}
+                  >
+                    <SelectTrigger id="safra">
+                      <SelectValue placeholder="Selecione a safra" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {opcoesSafra.map((safra) => (
+                        <SelectItem key={safra} value={safra}>
+                          {safra}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="pesoMedioSaca">Peso Médio por Saca (kg)</Label>
-                  <Input
-                    id="pesoMedioSaca"
-                    type="number"
-                    placeholder="25"
-                    value={newProducao.pesoMedioSaca}
-                    onChange={(e) => setNewProducao({ ...newProducao, pesoMedioSaca: Number(e.target.value) })}
-                  />
+                  <Label htmlFor="peso_medio_saca">Peso Médio por Saca (kg)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                      kg
+                    </span>
+                    <Input
+                      id="peso_medio_saca"
+                      type="number"
+                      placeholder="25"
+                      className="pl-10"
+                      value={newProducao.peso_medio_saca}
+                      onChange={(e) => setNewProducao({ ...newProducao, peso_medio_saca: Number(e.target.value) })}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -929,26 +982,32 @@ export default function Fazendas() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="precoPorTonelada">Preço por Tonelada (R$) *</Label>
-                  <Input
-                    id="precoPorTonelada"
-                    type="number"
-                    step="0.01"
-                    placeholder="Ex: 600.00"
-                    value={newProducao.precoPorTonelada}
-                    onChange={(e) => setNewProducao({ ...newProducao, precoPorTonelada: Number(e.target.value) })}
-                  />
+                  <Label htmlFor="preco_por_tonelada">Preço por Tonelada (R$) *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
+                    <Input
+                      id="preco_por_tonelada"
+                      placeholder="0,00"
+                      className="pl-10"
+                      value={newProducao.preco_por_tonelada > 0 ? formatarInputMoeda(String(newProducao.preco_por_tonelada * 100)) : ''}
+                      onChange={(e) => {
+                        const valorFormatado = formatarInputMoeda(e.target.value);
+                        const valorNumerico = desformatarMoeda(valorFormatado);
+                        setNewProducao({ ...newProducao, preco_por_tonelada: valorNumerico });
+                      }}
+                    />
+                  </div>
                 </div>
 
-                {newProducao.precoPorTonelada > 0 && newProducao.pesoMedioSaca > 0 && (
+                {newProducao.preco_por_tonelada > 0 && newProducao.peso_medio_saca > 0 && (
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Preço Calculado por Saca</Label>
                     <div className="flex items-center gap-2 h-10 px-3 border rounded-md bg-blue-50 dark:bg-blue-950/20">
                       <DollarSign className="h-4 w-4 text-blue-600" />
                       <span className="font-bold text-blue-600">
-                        R$ {((newProducao.precoPorTonelada * newProducao.pesoMedioSaca) / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R$ {((newProducao.preco_por_tonelada * newProducao.peso_medio_saca) / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </span>
-                      <span className="text-xs text-muted-foreground">/saca ({newProducao.pesoMedioSaca}kg)</span>
+                      <span className="text-xs text-muted-foreground">/saca ({newProducao.peso_medio_saca}kg)</span>
                     </div>
                   </div>
                 )}
@@ -963,19 +1022,19 @@ export default function Fazendas() {
                   <div className="grid grid-cols-3 gap-4 text-sm">
                     <div>
                       <p className="text-blue-600 dark:text-blue-400">Sacas Carregadas</p>
-                      <p className="font-bold text-lg">{newProducao.totalSacasCarregadas?.toLocaleString("pt-BR") || 0}</p>
+                      <p className="font-bold text-lg">{newProducao.total_sacas_carregadas?.toLocaleString("pt-BR") || 0}</p>
                     </div>
                     <div>
                       <p className="text-blue-600 dark:text-blue-400">Toneladas</p>
-                      <p className="font-bold text-lg">{newProducao.totalToneladas?.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) || 0}</p>
+                      <p className="font-bold text-lg">{newProducao.total_toneladas?.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) || 0}</p>
                     </div>
                     <div>
                       <p className="text-blue-600 dark:text-blue-400">Faturamento</p>
-                      <p className="font-bold text-lg">R$ {newProducao.faturamentoTotal?.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) || "0,00"}</p>
+                      <p className="font-bold text-lg">R$ {newProducao.faturamento_total?.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) || "0,00"}</p>
                     </div>
                   </div>
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                    Último frete: {newProducao.ultimoFrete || "-"}
+                    Último frete: {newProducao.ultimo_frete || "-"}
                   </p>
                 </div>
               )}
@@ -1014,7 +1073,7 @@ export default function Fazendas() {
 
       {/* Modal de Detalhes - Redesenhado */}
       <Dialog open={!!selectedProducao} onOpenChange={() => setSelectedProducao(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto px-1">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-6">
           <DialogHeader>
             <div className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -1025,6 +1084,9 @@ export default function Fazendas() {
                 </Avatar>
                 <div className="flex-1">
                   <DialogTitle className="text-2xl font-bold mb-1">{selectedProducao?.fazenda}</DialogTitle>
+                  <DialogDescription className="sr-only">
+                    Detalhes completos da produção: {selectedProducao?.mercadoria} {selectedProducao?.variedade} - Safra {selectedProducao?.safra}
+                  </DialogDescription>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
@@ -1037,7 +1099,7 @@ export default function Fazendas() {
                   </div>
                 </div>
               </div>
-              {selectedProducao?.colheitaFinalizada ? (
+              {selectedProducao?.colheita_finalizada ? (
                 <Badge className="bg-emerald-600 text-white">
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   Colheita finalizada
@@ -1059,8 +1121,8 @@ export default function Fazendas() {
                         <Package className="h-5 w-5" />
                         <p className="text-sm font-medium">Sacas Carregadas</p>
                       </div>
-                      <p className="text-4xl font-bold text-blue-700 dark:text-blue-400">
-                        {selectedProducao.totalSacasCarregadas.toLocaleString("pt-BR")}
+                      <p className="text-3xl font-bold text-blue-700 dark:text-blue-400 whitespace-nowrap">
+                        {selectedProducao.total_sacas_carregadas.toLocaleString("pt-BR")}
                       </p>
                       <p className="text-xs text-muted-foreground">unidades transportadas</p>
                     </div>
@@ -1074,23 +1136,23 @@ export default function Fazendas() {
                         <Weight className="h-5 w-5" />
                         <p className="text-sm font-medium">Total em Toneladas</p>
                       </div>
-                      <p className="text-4xl font-bold text-purple-700 dark:text-purple-400">
-                        {selectedProducao.totalToneladas.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                      <p className="text-3xl font-bold text-purple-700 dark:text-purple-400 whitespace-nowrap">
+                        {selectedProducao.total_toneladas.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
                       </p>
                       <p className="text-xs text-muted-foreground">peso transportado</p>
                     </div>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-amber-50 to-yellow-100/50 dark:from-amber-950/30 dark:to-yellow-900/20 border-amber-200 dark:border-amber-800">
+                <Card className="bg-gradient-to-br from-green-50 to-emerald-100/50 dark:from-green-950/30 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
                   <CardContent className="p-6">
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                         <DollarSign className="h-5 w-5" />
                         <p className="text-sm font-medium">Faturamento Total</p>
                       </div>
-                      <p className="text-4xl font-bold text-amber-700 dark:text-amber-400">
-                        R$ {(selectedProducao.faturamentoTotal / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}k
+                      <p className="text-3xl font-bold text-green-700 dark:text-green-400 whitespace-nowrap">
+                        R$ {toNumber(selectedProducao.faturamento_total).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <p className="text-xs text-muted-foreground">receita acumulada</p>
                     </div>
@@ -1124,7 +1186,7 @@ export default function Fazendas() {
                     </div>
                     <div className="flex justify-between items-center py-2">
                       <span className="text-sm text-muted-foreground">Peso Médio/Saca:</span>
-                      <span className="font-semibold">{selectedProducao.pesoMedioSaca}kg</span>
+                      <span className="font-semibold">{selectedProducao.peso_medio_saca}kg</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -1140,59 +1202,132 @@ export default function Fazendas() {
                     <div className="flex justify-between items-center py-2 border-b">
                       <span className="text-sm text-muted-foreground">Preço/Tonelada:</span>
                       <span className="font-bold text-green-600">
-                        R$ {selectedProducao.precoPorTonelada.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R$ {selectedProducao.preco_por_tonelada.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b">
                       <span className="text-sm text-muted-foreground">Preço/Saca:</span>
                       <span className="font-bold text-blue-600">
-                        R$ {((selectedProducao.precoPorTonelada * selectedProducao.pesoMedioSaca) / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        R$ {((selectedProducao.preco_por_tonelada * selectedProducao.peso_medio_saca) / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                       </span>
                     </div>
-                    {selectedProducao.totalSacasCarregadas > 0 && (
+                    {selectedProducao.total_sacas_carregadas > 0 && (
                       <div className="flex justify-between items-center py-2 border-b">
-                        <span className="text-sm text-muted-foreground">Média Real/Saca:</span>
+                        <span className="text-sm text-muted-foreground">Lucro Liquido/Saca:</span>
                         <span className="font-bold text-purple-600">
-                          R$ {(selectedProducao.faturamentoTotal / selectedProducao.totalSacasCarregadas).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
+                          R$ {((selectedProducao.lucro_liquido || selectedProducao.faturamento_total - (toNumber(selectedProducao.total_custos_operacionais) || 0)) / selectedProducao.total_sacas_carregadas).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}
                         </span>
                       </div>
                     )}
                     <div className="flex justify-between items-center py-2">
                       <span className="text-sm text-muted-foreground">Último Frete:</span>
-                      <Badge variant="outline" className="font-mono">{selectedProducao.ultimoFrete}</Badge>
+                      {selectedProducao.ultimo_frete_data ? (
+                        <div className="text-right text-sm">
+                          <span className="font-semibold">
+                            {format(new Date(selectedProducao.ultimo_frete_data), "dd/MM/yyyy", { locale: ptBR })}
+                          </span>
+                          {selectedProducao.ultimo_frete_motorista && (
+                            <span className="text-muted-foreground ml-2">
+                              • {selectedProducao.ultimo_frete_motorista}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <Badge variant="outline">-</Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Estatísticas Avançadas */}
-              {selectedProducao.totalSacasCarregadas > 0 && (
-                <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-900/30 dark:to-slate-800/20">
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-purple-600" />
+              {selectedProducao.total_sacas_carregadas > 0 && (
+                <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-900/30 dark:to-slate-800/20 border-slate-200 dark:border-slate-700">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-slate-600 dark:text-slate-400" />
                       Análise de Performance
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="text-center p-4 bg-background rounded-lg shadow-sm">
-                        <p className="text-sm text-muted-foreground mb-2">Faturamento/Tonelada</p>
-                        <p className="text-2xl font-bold text-amber-600">
-                          R$ {(selectedProducao.faturamentoTotal / selectedProducao.totalToneladas).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Fretes Realizados */}
+                      <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/10 p-6 border border-blue-200/50 dark:border-blue-800/30 hover:shadow-md transition-all duration-300">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                            <Truck className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <Badge variant="outline" className="bg-white/60 dark:bg-slate-800/60 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                            {toNumber(selectedProducao.total_fretes_realizados) > 0 ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">Fretes Realizados</p>
+                        <p className="text-4xl font-bold text-blue-800 dark:text-blue-200 tracking-tight">
+                          {toNumber(selectedProducao.total_fretes_realizados) || 0}
                         </p>
+                        <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-2">total de viagens</p>
                       </div>
-                      <div className="text-center p-4 bg-background rounded-lg shadow-sm">
-                        <p className="text-sm text-muted-foreground mb-2">Fretes Estimados</p>
-                        <p className="text-2xl font-bold text-blue-600">
-                          {Math.ceil(selectedProducao.totalSacasCarregadas / 1200)}
+
+                      {/* Custos Operacionais */}
+                      <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/20 dark:to-rose-900/10 p-6 border border-rose-200/50 dark:border-rose-800/30 hover:shadow-md transition-all duration-300">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg">
+                            <AlertCircle className="h-6 w-6 text-rose-600 dark:text-rose-400" />
+                          </div>
+                          <Badge variant="outline" className="bg-white/60 dark:bg-slate-800/60 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800">
+                            Despesas
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium text-rose-700 dark:text-rose-300 mb-2">Custos Operacionais</p>
+                        <p className="text-3xl font-bold text-rose-800 dark:text-rose-200 tracking-tight whitespace-nowrap">
+                          R$ {toNumber(selectedProducao.total_custos_operacionais).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
+                        <p className="text-xs text-rose-600/70 dark:text-rose-400/70 mt-2">gastos totais</p>
                       </div>
-                      <div className="text-center p-4 bg-background rounded-lg shadow-sm">
-                        <p className="text-sm text-muted-foreground mb-2">Peso Real Médio/Saca</p>
-                        <p className="text-2xl font-bold text-purple-600">
-                          {((selectedProducao.totalToneladas * 1000) / selectedProducao.totalSacasCarregadas).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}kg
+
+                      {/* Receita Liquida */}
+                      <div className={`group relative overflow-hidden rounded-xl p-6 border hover:shadow-md transition-all duration-300 ${
+                        (toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) >= 0 
+                          ? "bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-emerald-900/10 border-emerald-200/50 dark:border-emerald-800/30" 
+                          : "bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/20 dark:to-orange-900/10 border-orange-200/50 dark:border-orange-800/30"
+                      }`}>
+                        <div className="flex items-start justify-between mb-4">
+                          <div className={`p-2 rounded-lg ${
+                            (toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) >= 0
+                              ? "bg-emerald-100 dark:bg-emerald-900/30"
+                              : "bg-orange-100 dark:bg-orange-900/30"
+                          }`}>
+                            {(toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) >= 0 ? (
+                              <TrendingUp className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <TrendingDown className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                            )}
+                          </div>
+                          <Badge variant="outline" className={`bg-white/60 dark:bg-slate-800/60 ${
+                            (toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) >= 0
+                              ? "text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"
+                              : "text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800"
+                          }`}>
+                            {(toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) >= 0 ? "Lucro" : "Prejuízo"}
+                          </Badge>
+                        </div>
+                        <p className={`text-sm font-medium mb-2 ${
+                          (toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) >= 0
+                            ? "text-emerald-700 dark:text-emerald-300"
+                            : "text-orange-700 dark:text-orange-300"
+                        }`}>Receita Líquida</p>
+                        <p className={`text-3xl font-bold tracking-tight whitespace-nowrap ${
+                          (toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) >= 0
+                            ? "text-emerald-800 dark:text-emerald-200"
+                            : "text-orange-800 dark:text-orange-200"
+                        }`}>
+                          R$ {((toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
+                        <p className={`text-xs mt-2 ${
+                          (toNumber(selectedProducao.lucro_liquido) || selectedProducao.faturamento_total - toNumber(selectedProducao.total_custos_operacionais)) >= 0
+                            ? "text-emerald-600/70 dark:text-emerald-400/70"
+                            : "text-orange-600/70 dark:text-orange-400/70"
+                        }`}>resultado final</p>
                       </div>
                     </div>
                   </CardContent>
@@ -1218,13 +1353,13 @@ export default function Fazendas() {
             )}
             {selectedProducao && (
               <Button
-                variant={selectedProducao.colheitaFinalizada ? "outline" : "default"}
+                variant={selectedProducao.colheita_finalizada ? "outline" : "default"}
                 onClick={() => handleToggleColheitaFinalizada(selectedProducao.id)}
                 size="lg"
                 className="gap-2"
               >
                 <CheckCircle2 className="h-4 w-4" />
-                {selectedProducao.colheitaFinalizada ? "Reabrir Colheita" : "Finalizar Colheita"}
+                {selectedProducao.colheita_finalizada ? "Reabrir Colheita" : "Finalizar Colheita"}
               </Button>
             )}
             <Button 

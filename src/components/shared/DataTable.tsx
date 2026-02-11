@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 interface Column<T> {
   key: string;
   header: string;
-  render?: (item: T) => ReactNode;
+  render?: (item: T, index: number) => ReactNode;
   className?: string;
 }
 
@@ -70,7 +70,7 @@ export function DataTable<T>({
                 {columns.map((column) => (
                   <TableCell key={column.key} className={cn("py-3 px-4", column.className)}>
                     {column.render
-                      ? column.render(item)
+                      ? column.render(item, index)
                       : (item as Record<string, unknown>)[column.key] as ReactNode}
                   </TableCell>
                 ))}

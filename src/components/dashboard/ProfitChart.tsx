@@ -9,16 +9,26 @@ import {
   Cell,
 } from "recharts";
 
-const data = [
-  { month: "Jan", lucro: 43000 },
-  { month: "Fev", lucro: 43000 },
-  { month: "Mar", lucro: 52000 },
-  { month: "Abr", lucro: 70000 },
-  { month: "Mai", lucro: 78000 },
-  { month: "Jun", lucro: 90000 },
-];
+interface ProfitData {
+  month: string;
+  lucro: number;
+}
 
-export function ProfitChart() {
+interface ProfitChartProps {
+  data?: ProfitData[];
+}
+
+export function ProfitChart({ data: propData }: ProfitChartProps) {
+  const defaultData = [
+    { month: "Jan", lucro: 43000 },
+    { month: "Fev", lucro: 43000 },
+    { month: "Mar", lucro: 52000 },
+    { month: "Abr", lucro: 70000 },
+    { month: "Mai", lucro: 78000 },
+    { month: "Jun", lucro: 90000 },
+  ];
+
+  const data = propData || defaultData;
   return (
     <div className="bg-card rounded-xl border p-6 animate-fade-in">
       <div className="flex items-center justify-between mb-6">

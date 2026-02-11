@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -25,253 +26,141 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Edit, Eye, Truck, Gauge, Weight, CalendarDays, Wrench, AlertCircle, Save, X, Info, FileText, Shield, Fuel, Package as PackageIcon } from "lucide-react";
 import { toast } from "sonner";
-
-// Interface de Motorista para vinculação
-interface Motorista {
-  id: string;
-  nome: string;
-  cpf: string;
-  telefone: string;
-  status: "ativo" | "inativo" | "ferias";
-  tipo: "proprio" | "terceirizado";
-}
-
-// Dados mockados de motoristas (sincronizado com a tela de Motoristas)
-const motoristasDisponiveis: Motorista[] = [
-  {
-    id: "MOT-001",
-    nome: "Carlos Silva",
-    cpf: "123.456.789-00",
-    telefone: "(11) 98765-4321",
-    status: "ativo",
-    tipo: "proprio",
-  },
-  {
-    id: "MOT-002",
-    nome: "João Oliveira",
-    cpf: "234.567.890-11",
-    telefone: "(21) 97654-3210",
-    status: "ativo",
-    tipo: "terceirizado",
-  },
-  {
-    id: "MOT-003",
-    nome: "Pedro Santos",
-    cpf: "345.678.901-22",
-    telefone: "(31) 96543-2109",
-    status: "ativo",
-    tipo: "proprio",
-  },
-  {
-    id: "MOT-004",
-    nome: "André Costa",
-    cpf: "456.789.012-33",
-    telefone: "(41) 95432-1098",
-    status: "ativo",
-    tipo: "terceirizado",
-  },
-  {
-    id: "MOT-005",
-    nome: "Fernando Alves",
-    cpf: "567.890.123-44",
-    telefone: "(51) 94321-0987",
-    status: "ativo",
-    tipo: "proprio",
-  },
-];
-
-interface Caminhao {
-  id: string;
-  placa: string;
-  placaCarreta?: string; // Placa do reboque/carreta
-  modelo: string; // Modelo completo incluindo marca (ex: Volvo FH 540)
-  anoFabricacao: number; // Ano de fabricação (INT no banco)
-  capacidadeToneladas: number; // Capacidade em toneladas (DECIMAL no banco)
-  status: "disponivel" | "em_viagem" | "manutencao";
-  kmAtual: number; // KM atual do veículo
-  motoristaFixoId?: string; // ID do motorista fixo (FK)
-  // Documentação e Fiscal
-  renavam?: string;
-  renavamCarreta?: string; // RENAVAM do reboque/carreta
-  chassi?: string;
-  registroAntt?: string;
-  validadeSeguro?: string; // Formato DD/MM/AAAA (DATE no banco)
-  validadeLicenciamento?: string; // Formato DD/MM/AAAA (DATE no banco)
-  // Especificações Técnicas
-  tipoCombustivel?: "DIESEL" | "S10" | "ARLA" | "OUTRO";
-  tipoVeiculo?: "TRUCADO" | "TOCO" | "CARRETA" | "BITREM" | "RODOTREM";
-  // Gestão e Manutenção
-  proprietarioTipo?: "PROPRIO" | "TERCEIRO" | "AGREGADO";
-  ultimaManutencaoData?: string; // Data da última manutenção (DATE no banco)
-  proximaManutencaoKm?: number; // KM previsto para próxima revisão
-}
-
-const caminhoesData: Caminhao[] = [
-  {
-    id: "1",
-    placa: "ABC-1234",
-    placaCarreta: "CRT-5678",
-    modelo: "Volvo FH 540",
-    anoFabricacao: 2020,
-    capacidadeToneladas: 40,
-    status: "em_viagem",
-    kmAtual: 245000,
-    motoristaFixoId: "MOT-001",
-    ultimaManutencaoData: "15/01/2025",
-    proximaManutencaoKm: 250000,
-    renavam: "12345678901",
-    renavamCarreta: "98765432109",
-    chassi: "9BWHE21JX24060831",
-    registroAntt: "ANTT-2020-001",
-    validadeSeguro: "15/12/2025",
-    validadeLicenciamento: "31/03/2025",
-    tipoCombustivel: "S10",
-    tipoVeiculo: "CARRETA",
-    proprietarioTipo: "PROPRIO",
-  },
-  {
-    id: "2",
-    placa: "DEF-5678",
-    placaCarreta: "BTR-9012",
-    modelo: "Scania R450",
-    anoFabricacao: 2019,
-    capacidadeToneladas: 35,
-    status: "disponivel",
-    kmAtual: 180000,
-    motoristaFixoId: "MOT-002",
-    ultimaManutencaoData: "10/01/2025",
-    proximaManutencaoKm: 200000,
-    renavam: "23456789012",
-    renavamCarreta: "87654321098",
-    chassi: "9BSE4X2BXCR123456",
-    registroAntt: "ANTT-2019-002",
-    validadeSeguro: "20/11/2025",
-    validadeLicenciamento: "28/02/2025",
-    tipoCombustivel: "DIESEL",
-    tipoVeiculo: "BITREM",
-    proprietarioTipo: "TERCEIRO",
-  },
-  {
-    id: "3",
-    placa: "GHI-9012",
-    modelo: "Mercedes Actros",
-    anoFabricacao: 2018,
-    capacidadeToneladas: 38,
-    status: "manutencao",
-    kmAtual: 320000,
-    ultimaManutencaoData: "25/01/2025",
-    proximaManutencaoKm: 350000,
-    renavam: "34567890123",
-    chassi: "WDB9340231K123789",
-    registroAntt: "ANTT-2018-003",
-    validadeSeguro: "10/10/2025",
-    validadeLicenciamento: "15/01/2025",
-    tipoCombustivel: "S10",
-    tipoVeiculo: "TRUCADO",
-    proprietarioTipo: "PROPRIO",
-  },
-  {
-    id: "4",
-    placa: "JKL-3456",
-    placaCarreta: "DAF-7890",
-    modelo: "DAF XF",
-    anoFabricacao: 2021,
-    capacidadeToneladas: 42,
-    status: "disponivel",
-    kmAtual: 95000,
-    motoristaFixoId: "MOT-003",
-    ultimaManutencaoData: "05/01/2025",
-    proximaManutencaoKm: 150000,
-    renavam: "45678901234",
-    renavamCarreta: "76543210987",
-    chassi: "XLRTE47MS0E654321",
-    registroAntt: "ANTT-2021-004",
-    validadeSeguro: "30/06/2026",
-    validadeLicenciamento: "15/04/2025",
-    tipoCombustivel: "S10",
-    tipoVeiculo: "CARRETA",
-    proprietarioTipo: "AGREGADO",
-  },
-  {
-    id: "5",
-    placa: "MNO-7890",
-    placaCarreta: "RDT-1234",
-    modelo: "Volvo FH 500",
-    anoFabricacao: 2020,
-    capacidadeToneladas: 40,
-    status: "em_viagem",
-    kmAtual: 210000,
-    motoristaFixoId: "MOT-004",
-    ultimaManutencaoData: "12/01/2025",
-    proximaManutencaoKm: 240000,
-    renavam: "56789012345",
-    renavamCarreta: "65432109876",
-    chassi: "YV2A22C60GA456789",
-    registroAntt: "ANTT-2020-005",
-    validadeSeguro: "18/08/2025",
-    validadeLicenciamento: "22/05/2025",
-    tipoCombustivel: "DIESEL",
-    tipoVeiculo: "RODOTREM",
-    proprietarioTipo: "PROPRIO",
-  },
-];
+import caminhoesService from "@/services/caminhoes";
+import motoristasService from "@/services/motoristas";
+import type { Caminhao, CriarCaminhaoPayload, Motorista } from "@/types";
 
 const statusConfig = {
   disponivel: { label: "Disponível", variant: "active" as const },
   em_viagem: { label: "Em Viagem", variant: "inTransit" as const },
-  manutencao: { label: "Manutenção", variant: "warning" as const },
+  em_manutencao: { label: "Manutenção", variant: "warning" as const },
+  inativo: { label: "Inativo", variant: "cancelled" as const },
 };
 
 export default function Frota() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedCaminhao, setSelectedCaminhao] = useState<Caminhao | null>(null);
-  const [editedCaminhao, setEditedCaminhao] = useState<Partial<Caminhao>>({});
+  const [editedCaminhao, setEditedCaminhao] = useState<Partial<CriarCaminhaoPayload>>({});
+
+  // Query para buscar caminhões
+  const { data: caminhoesResponse, isLoading } = useQuery({
+    queryKey: ["caminhoes"],
+    queryFn: caminhoesService.listarCaminhoes,
+  });
+
+  // Query para buscar motoristas
+  const { data: motoristasResponse, isLoading: isLoadingMotoristas } = useQuery({
+    queryKey: ["motoristas"],
+    queryFn: motoristasService.listarMotoristas,
+  });
+
+  const caminhoes = caminhoesResponse?.data || [];
+  const motoristasDisponiveis = motoristasResponse?.data || [];
+
+  // Mutation para criar caminhão
+  const criarMutation = useMutation({
+    mutationFn: caminhoesService.criarCaminhao,
+    onSuccess: (response) => {
+      if (response.success) {
+        toast.success("Caminhão cadastrado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["caminhoes"] });
+        setIsModalOpen(false);
+      } else {
+        toast.error(response.message || "Erro ao cadastrar caminhão");
+      }
+    },
+    onError: () => {
+      toast.error("Erro ao cadastrar caminhão");
+    },
+  });
+
+  // Mutation para editar caminhão
+  const editarMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: Partial<CriarCaminhaoPayload> }) =>
+      caminhoesService.atualizarCaminhao(id, payload),
+    onSuccess: (response) => {
+      if (response.success) {
+        toast.success("Caminhão atualizado com sucesso!");
+        queryClient.invalidateQueries({ queryKey: ["caminhoes"] });
+        setIsModalOpen(false);
+      } else {
+        toast.error(response.message || "Erro ao atualizar caminhão");
+      }
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar caminhão");
+    },
+  });
 
   const handleOpenNewModal = () => {
     setEditedCaminhao({
       placa: "",
-      placaCarreta: "",
+      placa_carreta: "",
       modelo: "",
-      anoFabricacao: new Date().getFullYear(),
-      capacidadeToneladas: 0,
+      ano_fabricacao: new Date().getFullYear(),
+      capacidade_toneladas: 0,
       status: "disponivel",
-      kmAtual: 0,
-      motoristaFixoId: "",
-      ultimaManutencaoData: "",
-      proximaManutencaoKm: 0,
+      km_atual: 0,
+      motorista_fixo_id: "",
+      ultima_manutencao_data: "",
+      proxima_manutencao_km: 0,
       renavam: "",
-      renavamCarreta: "",
       chassi: "",
-      registroAntt: "",
-      validadeSeguro: "",
-      validadeLicenciamento: "",
-      tipoCombustivel: undefined,
-      tipoVeiculo: undefined,
-      proprietarioTipo: undefined,
+      registro_antt: "",
+      validade_seguro: "",
+      validade_licenciamento: "",
+      tipo_combustivel: undefined,
+      tipo_veiculo: undefined,
+      proprietario_tipo: undefined,
     });
     setIsEditing(false);
+    setSelectedCaminhao(null);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (caminhao: Caminhao) => {
-    setEditedCaminhao(caminhao);
+    // Converter campos da API para o formato do formulário
+    setEditedCaminhao({
+      placa: caminhao.placa,
+      placa_carreta: caminhao.placa_carreta || "",
+      modelo: caminhao.modelo,
+      ano_fabricacao: caminhao.ano_fabricacao,
+      capacidade_toneladas: caminhao.capacidade_toneladas,
+      status: caminhao.status,
+      km_atual: caminhao.km_atual,
+      motorista_fixo_id: caminhao.motorista_fixo_id || "",
+      ultima_manutencao_data: caminhao.ultima_manutencao_data || "",
+      proxima_manutencao_km: caminhao.proxima_manutencao_km || 0,
+      renavam: caminhao.renavam || "",
+      chassi: caminhao.chassi || "",
+      registro_antt: caminhao.registro_antt || "",
+      validade_seguro: caminhao.validade_seguro || "",
+      validade_licenciamento: caminhao.validade_licenciamento || "",
+      tipo_combustivel: caminhao.tipo_combustivel,
+      tipo_veiculo: caminhao.tipo_veiculo,
+      proprietario_tipo: caminhao.proprietario_tipo,
+    });
     setIsEditing(true);
+    setSelectedCaminhao(caminhao);
     setIsModalOpen(true);
   };
 
   const handleSave = () => {
-    if (isEditing) {
-      toast.success("Caminhão atualizado com sucesso!");
+    if (isEditing && selectedCaminhao) {
+      editarMutation.mutate({
+        id: selectedCaminhao.id,
+        payload: editedCaminhao,
+      });
     } else {
-      toast.success("Caminhão cadastrado com sucesso!");
+      criarMutation.mutate(editedCaminhao as CriarCaminhaoPayload);
     }
-    setIsModalOpen(false);
   };
 
-  const filteredData = caminhoesData.filter((caminhao) => {
+  const filteredData = caminhoes.filter((caminhao) => {
     const matchesSearch =
       caminhao.placa.toLowerCase().includes(search.toLowerCase()) ||
       caminhao.modelo.toLowerCase().includes(search.toLowerCase());
@@ -316,29 +205,29 @@ export default function Frota() {
           <div className="flex-1 min-w-0 space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-mono font-bold text-base text-foreground tracking-wide">{item.placa}</p>
-              {item.placaCarreta && (
+              {item.placa_carreta && (
                 <>
                   <span className="text-muted-foreground font-bold">+</span>
-                  <p className="font-mono font-bold text-base text-blue-600 dark:text-blue-400 tracking-wide">{item.placaCarreta}</p>
+                  <p className="font-mono font-bold text-base text-blue-600 dark:text-blue-400 tracking-wide">{item.placa_carreta}</p>
                 </>
               )}
             </div>
             <p className="text-xs text-muted-foreground font-medium">{item.modelo}</p>
             <div className="flex items-center gap-1.5 flex-wrap">
               <Badge variant="outline" className="text-[10px] font-semibold py-0 px-2">
-                {item.anoFabricacao}
+                {item.ano_fabricacao}
               </Badge>
-              {item.tipoVeiculo && (
+              {item.tipo_veiculo && (
                 <Badge variant="secondary" className="text-[10px] py-0 px-2">
-                  {item.tipoVeiculo}
+                  {item.tipo_veiculo}
                 </Badge>
               )}
-              {item.proprietarioTipo && (
+              {item.proprietario_tipo && (
                 <Badge 
-                  variant={item.proprietarioTipo === "PROPRIO" ? "default" : "outline"}
+                  variant={item.proprietario_tipo === "PROPRIO" ? "default" : "outline"}
                   className="text-xs"
                 >
-                  {item.proprietarioTipo}
+                  {item.proprietario_tipo}
                 </Badge>
               )}
             </div>
@@ -356,10 +245,10 @@ export default function Frota() {
       ),
     },
     {
-      key: "motoristaFixoId",
+      key: "motorista_fixo_id",
       header: "Motorista",
       render: (item: Caminhao) => {
-        const motorista = motoristasDisponiveis.find(m => m.id === item.motoristaFixoId);
+        const motorista = motoristasDisponiveis.find(m => m.id === item.motorista_fixo_id);
         return (
           <>
             {motorista ? (
@@ -395,22 +284,22 @@ export default function Frota() {
           <div className="flex items-center gap-2">
             <Weight className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
             <div className="flex items-baseline gap-1">
-              <span className="font-bold text-base text-foreground">{item.capacidadeToneladas}</span>
+              <span className="font-bold text-base text-foreground">{item.capacidade_toneladas}</span>
               <span className="text-[10px] text-muted-foreground">ton</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <Gauge className="h-3.5 w-3.5 text-orange-600 flex-shrink-0" />
             <div className="flex items-baseline gap-1">
-              <span className="font-semibold text-xs text-foreground">{item.kmAtual.toLocaleString("pt-BR")}</span>
+              <span className="font-semibold text-xs text-foreground">{item.km_atual.toLocaleString("pt-BR")}</span>
               <span className="text-[10px] text-muted-foreground">km</span>
             </div>
           </div>
-          {item.tipoCombustivel && (
+          {item.tipo_combustivel && (
             <div className="flex items-center gap-2">
               <Fuel className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
               <Badge variant="outline" className="text-[10px] font-semibold py-0 px-2">
-                {item.tipoCombustivel}
+                {item.tipo_combustivel}
               </Badge>
             </div>
           )}
@@ -421,15 +310,15 @@ export default function Frota() {
       key: "documentacao",
       header: "Documentação",
       render: (item: Caminhao) => {
-        const seguroExpired = isDocumentExpired(item.validadeSeguro);
-        const seguroExpiring = isDocumentExpiringSoon(item.validadeSeguro);
-        const licExpired = isDocumentExpired(item.validadeLicenciamento);
-        const licExpiring = isDocumentExpiringSoon(item.validadeLicenciamento);
+        const seguroExpired = isDocumentExpired(item.validade_seguro || undefined);
+        const seguroExpiring = isDocumentExpiringSoon(item.validade_seguro || undefined);
+        const licExpired = isDocumentExpired(item.validade_licenciamento || undefined);
+        const licExpiring = isDocumentExpiringSoon(item.validade_licenciamento || undefined);
         const hasAlert = seguroExpired || seguroExpiring || licExpired || licExpiring;
 
         return (
           <div className="space-y-2">
-            {item.validadeSeguro && (
+            {item.validade_seguro && (
               <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md ${
                 seguroExpired 
                   ? "bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800" 
@@ -447,14 +336,14 @@ export default function Frota() {
                     : seguroExpiring ? "text-orange-700 dark:text-orange-400" 
                     : "text-foreground"
                   }`}>
-                    {item.validadeSeguro}
+                    {item.validade_seguro}
                   </p>
                 </div>
                 {seguroExpired && <AlertCircle className="h-3.5 w-3.5 text-red-600" />}
                 {seguroExpiring && !seguroExpired && <AlertCircle className="h-3.5 w-3.5 text-orange-600" />}
               </div>
             )}
-            {item.validadeLicenciamento && (
+            {item.validade_licenciamento && (
               <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md ${
                 licExpired 
                   ? "bg-red-100 dark:bg-red-950/40 border border-red-300 dark:border-red-800" 
@@ -472,14 +361,14 @@ export default function Frota() {
                     : licExpiring ? "text-orange-700 dark:text-orange-400" 
                     : "text-foreground"
                   }`}>
-                    {item.validadeLicenciamento}
+                    {item.validade_licenciamento}
                   </p>
                 </div>
                 {licExpired && <AlertCircle className="h-3.5 w-3.5 text-red-600" />}
                 {licExpiring && !licExpired && <AlertCircle className="h-3.5 w-3.5 text-orange-600" />}
               </div>
             )}
-            {!item.validadeSeguro && !item.validadeLicenciamento && (
+            {!item.validade_seguro && !item.validade_licenciamento && (
               <span className="text-xs text-muted-foreground italic">Não informado</span>
             )}
           </div>
@@ -487,18 +376,21 @@ export default function Frota() {
       },
     },
     {
-      key: "proximaManutencao",
+      key: "proxima_manutencao",
       header: "Manutenção",
       render: (item: Caminhao) => {
-        const status = getMaintenanceStatus(item.kmAtual, item.proximaManutencaoKm!);
-        const percentual = ((item.kmAtual / item.proximaManutencaoKm!) * 100).toFixed(0);
-        const kmRestante = (item.proximaManutencaoKm! - item.kmAtual).toLocaleString("pt-BR");
+        if (!item.proxima_manutencao_km) {
+          return <span className="text-xs text-muted-foreground italic">Não informado</span>;
+        }
+        const status = getMaintenanceStatus(item.km_atual, item.proxima_manutencao_km);
+        const percentual = ((item.km_atual / item.proxima_manutencao_km) * 100).toFixed(0);
+        const kmRestante = (item.proxima_manutencao_km - item.km_atual).toLocaleString("pt-BR");
         
         return (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Wrench className={`h-4 w-4 ${status === "critical" ? "text-red-600" : status === "warning" ? "text-yellow-600" : "text-green-600"}`} />
-              <span className="text-xs text-muted-foreground">Última: {item.ultimaManutencaoData}</span>
+              <span className="text-xs text-muted-foreground">Última: {item.ultima_manutencao_data || "N/A"}</span>
             </div>
             <div className="space-y-1">
               <div className="flex items-center justify-between">
@@ -594,7 +486,7 @@ export default function Frota() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Total de Veículos</p>
-              <p className="text-xl font-bold text-green-700 dark:text-green-400">{caminhoesData.length}</p>
+              <p className="text-xl font-bold text-green-700 dark:text-green-400">{caminhoes.length}</p>
             </div>
           </div>
         </Card>
@@ -607,7 +499,7 @@ export default function Frota() {
             <div>
               <p className="text-xs text-muted-foreground">Disponíveis</p>
               <p className="text-xl font-bold text-blue-700 dark:text-blue-400">
-                {caminhoesData.filter(c => c.status === "disponivel").length}
+                {caminhoes.filter(c => c.status === "disponivel").length}
               </p>
             </div>
           </div>
@@ -621,11 +513,11 @@ export default function Frota() {
             <div>
               <p className="text-xs text-muted-foreground">Alertas Documentação</p>
               <p className="text-xl font-bold text-orange-700 dark:text-orange-400">
-                {caminhoesData.filter(c => 
-                  isDocumentExpired(c.validadeSeguro) || 
-                  isDocumentExpired(c.validadeLicenciamento) ||
-                  isDocumentExpiringSoon(c.validadeSeguro) ||
-                  isDocumentExpiringSoon(c.validadeLicenciamento)
+                {caminhoes.filter(c => 
+                  isDocumentExpired(c.validade_seguro || undefined) || 
+                  isDocumentExpired(c.validade_licenciamento || undefined) ||
+                  isDocumentExpiringSoon(c.validade_seguro || undefined) ||
+                  isDocumentExpiringSoon(c.validade_licenciamento || undefined)
                 ).length}
               </p>
             </div>
@@ -640,7 +532,7 @@ export default function Frota() {
             <div>
               <p className="text-xs text-muted-foreground">Manutenção Crítica</p>
               <p className="text-xl font-bold text-red-700 dark:text-red-400">
-                {caminhoesData.filter(c => getMaintenanceStatus(c.kmAtual, c.proximaManutencaoKm!) === "critical").length}
+                {caminhoes.filter(c => c.proxima_manutencao_km && getMaintenanceStatus(c.km_atual, c.proxima_manutencao_km) === "critical").length}
               </p>
             </div>
           </div>
@@ -660,16 +552,26 @@ export default function Frota() {
             <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="disponivel">Disponível</SelectItem>
             <SelectItem value="em_viagem">Em Viagem</SelectItem>
-            <SelectItem value="manutencao">Manutenção</SelectItem>
+            <SelectItem value="em_manutencao">Em Manutenção</SelectItem>
+            <SelectItem value="inativo">Inativo</SelectItem>
           </SelectContent>
         </Select>
       </FilterBar>
 
-      <DataTable<Caminhao>
-        columns={columns}
-        data={filteredData}
-        emptyMessage="Nenhum caminhão encontrado"
-      />
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-3">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent"></div>
+            <p className="text-sm text-muted-foreground">Carregando frota...</p>
+          </div>
+        </div>
+      ) : (
+        <DataTable<Caminhao>
+          columns={columns}
+          data={filteredData}
+          emptyMessage="Nenhum caminhão encontrado"
+        />
+      )}
 
       {/* Details Modal */}
       <Dialog open={!!selectedCaminhao} onOpenChange={() => setSelectedCaminhao(null)}>
@@ -721,7 +623,7 @@ export default function Frota() {
                     <CalendarDays className="h-3.5 w-3.5 text-blue-600" />
                     <p className="text-xs text-muted-foreground">Ano de Fabricação</p>
                   </div>
-                  <p className="text-lg font-bold text-blue-600">{selectedCaminhao.anoFabricacao}</p>
+                  <p className="text-lg font-bold text-blue-600">{selectedCaminhao.ano_fabricacao}</p>
                 </Card>
 
                 <Card className="p-3 border-l-4 border-l-green-500">
@@ -729,7 +631,7 @@ export default function Frota() {
                     <Weight className="h-3.5 w-3.5 text-green-600" />
                     <p className="text-xs text-muted-foreground">Capacidade</p>
                   </div>
-                  <p className="text-lg font-bold text-green-600">{selectedCaminhao.capacidadeToneladas} ton</p>
+                  <p className="text-lg font-bold text-green-600">{selectedCaminhao.capacidade_toneladas} ton</p>
                 </Card>
 
                 <Card className="p-3 border-l-4 border-l-purple-500">
@@ -738,7 +640,7 @@ export default function Frota() {
                     <p className="text-xs text-muted-foreground">KM Rodados</p>
                   </div>
                   <p className="text-lg font-bold text-purple-600">
-                    {selectedCaminhao.kmAtual.toLocaleString("pt-BR")}
+                    {selectedCaminhao.km_atual.toLocaleString("pt-BR")}
                   </p>
                 </Card>
               </div>
@@ -746,9 +648,9 @@ export default function Frota() {
               <Separator />
 
               {/* Maintenance */}
-              {(() => {
-                const status = getMaintenanceStatus(selectedCaminhao.kmAtual, selectedCaminhao.proximaManutencaoKm!);
-                const percentual = ((selectedCaminhao.kmAtual / selectedCaminhao.proximaManutencaoKm!) * 100).toFixed(0);
+              {selectedCaminhao.proxima_manutencao_km && (() => {
+                const status = getMaintenanceStatus(selectedCaminhao.km_atual, selectedCaminhao.proxima_manutencao_km);
+                const percentual = ((selectedCaminhao.km_atual / selectedCaminhao.proxima_manutencao_km) * 100).toFixed(0);
                 return (
                   <div>
                     <h4 className="font-semibold mb-4 flex items-center gap-2">
@@ -760,11 +662,11 @@ export default function Frota() {
                         <div className="flex items-center justify-between mb-3">
                           <div>
                             <p className="text-sm text-muted-foreground">Última Manutenção</p>
-                            <p className="font-semibold">{selectedCaminhao.ultimaManutencaoData}</p>
+                            <p className="font-semibold">{selectedCaminhao.ultima_manutencao_data || "N/A"}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-muted-foreground">Próxima em</p>
-                            <p className="font-semibold">{selectedCaminhao.proximaManutencaoKm?.toLocaleString("pt-BR")} km</p>
+                            <p className="font-semibold">{selectedCaminhao.proxima_manutencao_km?.toLocaleString("pt-BR")} km</p>
                           </div>
                         </div>
                         <div className="space-y-2">
@@ -797,8 +699,8 @@ export default function Frota() {
                 );
               })()}
 
-              {selectedCaminhao.motoristaFixoId && (() => {
-                const motorista = motoristasDisponiveis.find(m => m.id === selectedCaminhao.motoristaFixoId);
+              {selectedCaminhao.motorista_fixo_id && (() => {
+                const motorista = motoristasDisponiveis.find(m => m.id === selectedCaminhao.motorista_fixo_id);
                 return motorista ? (
                   <>
                     <Separator />
@@ -834,29 +736,29 @@ export default function Frota() {
                       <p className="font-mono font-semibold text-foreground">{selectedCaminhao.renavam}</p>
                     </Card>
                   )}
-                  {selectedCaminhao.renavamCarreta && (
+                  {selectedCaminhao.placa_carreta && selectedCaminhao.chassi && (
                     <Card className="p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-                      <p className="text-xs text-muted-foreground mb-1">RENAVAM da Carreta</p>
-                      <p className="font-mono font-semibold text-blue-700 dark:text-blue-300">{selectedCaminhao.renavamCarreta}</p>
+                      <p className="text-xs text-muted-foreground mb-1">Chassi</p>
+                      <p className="font-mono font-semibold text-blue-700 dark:text-blue-300">{selectedCaminhao.chassi}</p>
                     </Card>
                   )}
-                  {selectedCaminhao.chassi && (
+                  {selectedCaminhao.chassi && !selectedCaminhao.placa_carreta && (
                     <Card className="p-4 bg-muted/30">
                       <p className="text-xs text-muted-foreground mb-1">Chassi</p>
                       <p className="font-mono font-semibold text-foreground">{selectedCaminhao.chassi}</p>
                     </Card>
                   )}
-                  {selectedCaminhao.registroAntt && (
+                  {selectedCaminhao.registro_antt && (
                     <Card className="p-4 bg-muted/30">
                       <p className="text-xs text-muted-foreground mb-1">Registro ANTT</p>
-                      <p className="font-mono font-semibold text-foreground">{selectedCaminhao.registroAntt}</p>
+                      <p className="font-mono font-semibold text-foreground">{selectedCaminhao.registro_antt}</p>
                     </Card>
                   )}
-                  {selectedCaminhao.proprietarioTipo && (
+                  {selectedCaminhao.proprietario_tipo && (
                     <Card className="p-4 bg-muted/30">
                       <p className="text-xs text-muted-foreground mb-1">Tipo de Proprietário</p>
                       <Badge variant="outline" className="font-semibold">
-                        {selectedCaminhao.proprietarioTipo}
+                        {selectedCaminhao.proprietario_tipo}
                       </Badge>
                     </Card>
                   )}
@@ -864,22 +766,22 @@ export default function Frota() {
 
                 {/* Validades */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  {selectedCaminhao.validadeSeguro && (
+                  {selectedCaminhao.validade_seguro && (
                     <Card className="p-4 border-l-4 border-l-orange-500">
                       <div className="flex items-center gap-2 mb-2">
                         <Shield className="h-4 w-4 text-orange-600" />
                         <p className="text-sm text-muted-foreground">Validade do Seguro</p>
                       </div>
-                      <p className="text-lg font-bold text-orange-600">{selectedCaminhao.validadeSeguro}</p>
+                      <p className="text-lg font-bold text-orange-600">{selectedCaminhao.validade_seguro}</p>
                     </Card>
                   )}
-                  {selectedCaminhao.validadeLicenciamento && (
+                  {selectedCaminhao.validade_licenciamento && (
                     <Card className="p-4 border-l-4 border-l-cyan-500">
                       <div className="flex items-center gap-2 mb-2">
                         <FileText className="h-4 w-4 text-cyan-600" />
                         <p className="text-sm text-muted-foreground">Validade do Licenciamento</p>
                       </div>
-                      <p className="text-lg font-bold text-cyan-600">{selectedCaminhao.validadeLicenciamento}</p>
+                      <p className="text-lg font-bold text-cyan-600">{selectedCaminhao.validade_licenciamento}</p>
                     </Card>
                   )}
                 </div>
@@ -894,22 +796,22 @@ export default function Frota() {
                   Especificações Técnicas
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedCaminhao.tipoVeiculo && (
+                  {selectedCaminhao.tipo_veiculo && (
                     <Card className="p-4 border-l-4 border-l-indigo-500">
                       <div className="flex items-center gap-2 mb-2">
                         <Truck className="h-4 w-4 text-indigo-600" />
                         <p className="text-sm text-muted-foreground">Tipo de Veículo</p>
                       </div>
-                      <p className="text-lg font-bold text-indigo-600">{selectedCaminhao.tipoVeiculo}</p>
+                      <p className="text-lg font-bold text-indigo-600">{selectedCaminhao.tipo_veiculo}</p>
                     </Card>
                   )}
-                  {selectedCaminhao.tipoCombustivel && (
+                  {selectedCaminhao.tipo_combustivel && (
                     <Card className="p-4 border-l-4 border-l-amber-500">
                       <div className="flex items-center gap-2 mb-2">
                         <Fuel className="h-4 w-4 text-amber-600" />
                         <p className="text-sm text-muted-foreground">Tipo de Combustível</p>
                       </div>
-                      <p className="text-lg font-bold text-amber-600">{selectedCaminhao.tipoCombustivel}</p>
+                      <p className="text-lg font-bold text-amber-600">{selectedCaminhao.tipo_combustivel}</p>
                     </Card>
                   )}
                 </div>
@@ -958,7 +860,7 @@ export default function Frota() {
                 </div>
                 
                 {/* Placa da Carreta - Mostrada apenas para tipos que precisam */}
-                {editedCaminhao.tipoVeiculo && ["CARRETA", "BITREM", "RODOTREM"].includes(editedCaminhao.tipoVeiculo) && (
+                {editedCaminhao.tipo_veiculo && ["CARRETA", "BITREM", "TRUCK"].includes(editedCaminhao.tipo_veiculo) && (
                   <div className="space-y-2">
                     <Label htmlFor="placaCarreta" className="flex items-center gap-2">
                       <Info className="h-4 w-4 text-blue-600" />
@@ -968,8 +870,8 @@ export default function Frota() {
                       id="placaCarreta"
                       placeholder="CRT-5678"
                       className="font-mono font-semibold"
-                      value={editedCaminhao.placaCarreta || ""}
-                      onChange={(e) => setEditedCaminhao({ ...editedCaminhao, placaCarreta: e.target.value.toUpperCase() })}
+                    value={editedCaminhao.placa_carreta || ""}
+                      onChange={(e) => setEditedCaminhao({ ...editedCaminhao, placa_carreta: e.target.value.toUpperCase() })}
                     />
                     <p className="text-xs text-muted-foreground">Placa do reboque/carreta</p>
                   </div>
@@ -997,9 +899,9 @@ export default function Frota() {
                     Tipo de Veículo *
                   </Label>
                   <Select
-                    value={editedCaminhao.tipoVeiculo || ""}
-                    onValueChange={(value: "TRUCADO" | "TOCO" | "CARRETA" | "BITREM" | "RODOTREM") => 
-                      setEditedCaminhao({ ...editedCaminhao, tipoVeiculo: value })
+                    value={editedCaminhao.tipo_veiculo || ""}
+                    onValueChange={(value: "TRUCK" | "TOCO" | "CARRETA" | "BITREM") => 
+                      setEditedCaminhao({ ...editedCaminhao, tipo_veiculo: value })
                     }
                   >
                     <SelectTrigger>
@@ -1007,10 +909,9 @@ export default function Frota() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="CARRETA">Carreta</SelectItem>
-                      <SelectItem value="TRUCADO">Trucado</SelectItem>
+                      <SelectItem value="TRUCK">Truck</SelectItem>
                       <SelectItem value="TOCO">Toco</SelectItem>
                       <SelectItem value="BITREM">Bitrem</SelectItem>
-                      <SelectItem value="RODOTREM">Rodotrem</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1029,8 +930,8 @@ export default function Frota() {
                     type="number"
                     min="1990"
                     max={new Date().getFullYear()}
-                    value={editedCaminhao.anoFabricacao || ""}
-                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, anoFabricacao: parseInt(e.target.value) || new Date().getFullYear() })}
+                    value={editedCaminhao.ano_fabricacao || ""}
+                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, ano_fabricacao: parseInt(e.target.value) || new Date().getFullYear() })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1044,8 +945,8 @@ export default function Frota() {
                       type="number"
                       placeholder="40"
                       min="1"
-                      value={editedCaminhao.capacidadeToneladas || ""}
-                      onChange={(e) => setEditedCaminhao({ ...editedCaminhao, capacidadeToneladas: parseFloat(e.target.value) || 0 })}
+                      value={editedCaminhao.capacidade_toneladas || ""}
+                      onChange={(e) => setEditedCaminhao({ ...editedCaminhao, capacidade_toneladas: parseFloat(e.target.value) || 0 })}
                     />
                     <span className="text-sm font-semibold text-muted-foreground whitespace-nowrap">ton</span>
                   </div>
@@ -1060,8 +961,8 @@ export default function Frota() {
                     type="number"
                     placeholder="0"
                     min="0"
-                    value={editedCaminhao.kmAtual || ""}
-                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, kmAtual: parseInt(e.target.value) || 0 })}
+                    value={editedCaminhao.km_atual || ""}
+                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, km_atual: parseInt(e.target.value) || 0 })}
                   />
                 </div>
               </div>
@@ -1074,9 +975,9 @@ export default function Frota() {
                     Tipo de Combustível
                   </Label>
                   <Select
-                    value={editedCaminhao.tipoCombustivel || ""}
-                    onValueChange={(value: "DIESEL" | "S10" | "ARLA" | "OUTRO") => 
-                      setEditedCaminhao({ ...editedCaminhao, tipoCombustivel: value })
+                    value={editedCaminhao.tipo_combustivel || ""}
+                    onValueChange={(value: "DIESEL" | "GASOLINA" | "ETANOL" | "GNV") => 
+                      setEditedCaminhao({ ...editedCaminhao, tipo_combustivel: value })
                     }
                   >
                     <SelectTrigger>
@@ -1084,9 +985,9 @@ export default function Frota() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="DIESEL">Diesel</SelectItem>
-                      <SelectItem value="S10">S10</SelectItem>
-                      <SelectItem value="ARLA">ARLA</SelectItem>
-                      <SelectItem value="OUTRO">Outro</SelectItem>
+                      <SelectItem value="GASOLINA">Gasolina</SelectItem>
+                      <SelectItem value="ETANOL">Etanol</SelectItem>
+                      <SelectItem value="GNV">GNV</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1117,21 +1018,21 @@ export default function Frota() {
                   />
                   <p className="text-xs text-muted-foreground">RENAVAM do caminhão trator</p>
                 </div>
-                {editedCaminhao.tipoVeiculo && ["CARRETA", "BITREM", "RODOTREM"].includes(editedCaminhao.tipoVeiculo) && (
+                {editedCaminhao.tipo_veiculo && ["CARRETA", "BITREM", "TRUCK"].includes(editedCaminhao.tipo_veiculo) && (
                   <div className="space-y-2">
-                    <Label htmlFor="renavamCarreta" className="flex items-center gap-2">
+                    <Label htmlFor="placa_carreta_ref" className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-blue-600" />
-                      RENAVAM da Carreta
+                      Placa da Carreta (Referência)
                     </Label>
                     <Input
-                      id="renavamCarreta"
-                      placeholder="98765432109"
+                      id="placa_carreta_ref"
+                      placeholder="DEF5678"
                       className="font-mono"
                       maxLength={20}
-                      value={editedCaminhao.renavamCarreta || ""}
-                      onChange={(e) => setEditedCaminhao({ ...editedCaminhao, renavamCarreta: e.target.value })}
+                      value={editedCaminhao.placa_carreta || ""}
+                      onChange={(e) => setEditedCaminhao({ ...editedCaminhao, placa_carreta: e.target.value.toUpperCase() })}
                     />
-                    <p className="text-xs text-muted-foreground">RENAVAM do reboque/carreta</p>
+                    <p className="text-xs text-muted-foreground">Placa do reboque/carreta se aplicável</p>
                   </div>
                 )}
                 <div className="space-y-2">
@@ -1157,8 +1058,8 @@ export default function Frota() {
                     id="registroAntt"
                     placeholder="ANTT-2020-001"
                     maxLength={20}
-                    value={editedCaminhao.registroAntt || ""}
-                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, registroAntt: e.target.value })}
+                    value={editedCaminhao.registro_antt || ""}
+                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, registro_antt: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1167,9 +1068,9 @@ export default function Frota() {
                     Tipo de Proprietário
                   </Label>
                   <Select
-                    value={editedCaminhao.proprietarioTipo || "PROPRIO"}
-                    onValueChange={(value: "PROPRIO" | "TERCEIRO" | "AGREGADO") => 
-                      setEditedCaminhao({ ...editedCaminhao, proprietarioTipo: value })
+                    value={editedCaminhao.proprietario_tipo || "PROPRIO"}
+                    onValueChange={(value: "PROPRIO" | "TERCEIRIZADO") => 
+                      setEditedCaminhao({ ...editedCaminhao, proprietario_tipo: value })
                     }
                   >
                     <SelectTrigger>
@@ -1177,8 +1078,7 @@ export default function Frota() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="PROPRIO">Próprio</SelectItem>
-                      <SelectItem value="TERCEIRO">Terceiro</SelectItem>
-                      <SelectItem value="AGREGADO">Agregado</SelectItem>
+                      <SelectItem value="TERCEIRIZADO">Terceirizado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1194,8 +1094,8 @@ export default function Frota() {
                   <Input
                     id="validadeSeguro"
                     placeholder="DD/MM/AAAA"
-                    value={editedCaminhao.validadeSeguro || ""}
-                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, validadeSeguro: e.target.value })}
+                    value={editedCaminhao.validade_seguro || ""}
+                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, validade_seguro: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1206,8 +1106,8 @@ export default function Frota() {
                   <Input
                     id="validadeLicenciamento"
                     placeholder="DD/MM/AAAA"
-                    value={editedCaminhao.validadeLicenciamento || ""}
-                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, validadeLicenciamento: e.target.value })}
+                    value={editedCaminhao.validade_licenciamento || ""}
+                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, validade_licenciamento: e.target.value })}
                   />
                 </div>
               </div>
@@ -1229,7 +1129,7 @@ export default function Frota() {
                   </Label>
                   <Select
                     value={editedCaminhao.status || "disponivel"}
-                    onValueChange={(value: "disponivel" | "em_viagem" | "manutencao") => 
+                    onValueChange={(value: "disponivel" | "em_viagem" | "em_manutencao" | "inativo") => 
                       setEditedCaminhao({ ...editedCaminhao, status: value })
                     }
                   >
@@ -1249,10 +1149,16 @@ export default function Frota() {
                           Em Viagem
                         </div>
                       </SelectItem>
-                      <SelectItem value="manutencao">
+                      <SelectItem value="em_manutencao">
                         <div className="flex items-center gap-2">
                           <div className="h-2 w-2 rounded-full bg-yellow-500" />
-                          Manutenção
+                          Em Manutenção
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="inativo">
+                        <div className="flex items-center gap-2">
+                          <div className="h-2 w-2 rounded-full bg-gray-500" />
+                          Inativo
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -1264,11 +1170,11 @@ export default function Frota() {
                     Motorista Fixo
                   </Label>
                   <Select
-                    value={editedCaminhao.motoristaFixoId || "___none___"}
+                    value={editedCaminhao.motorista_fixo_id || "___none___"}
                     onValueChange={(value) => 
                       setEditedCaminhao({ 
                         ...editedCaminhao, 
-                        motoristaFixoId: value === "___none___" ? undefined : value 
+                        motorista_fixo_id: value === "___none___" ? undefined : value 
                       })
                     }
                   >
@@ -1281,7 +1187,7 @@ export default function Frota() {
                         .filter(m => m.status === "ativo")
                         .map((motorista) => (
                           <SelectItem key={motorista.id} value={motorista.id}>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 text-sm">
                               <div className="flex flex-col">
                                 <span className="font-semibold">{motorista.nome}</span>
                                 <span className="text-xs text-muted-foreground">
@@ -1321,8 +1227,8 @@ export default function Frota() {
                   <Input
                     id="ultimaManutencaoData"
                     placeholder="DD/MM/AAAA"
-                    value={editedCaminhao.ultimaManutencaoData || ""}
-                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, ultimaManutencaoData: e.target.value })}
+                    value={editedCaminhao.ultima_manutencao_data || ""}
+                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, ultima_manutencao_data: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1335,29 +1241,29 @@ export default function Frota() {
                     type="number"
                     placeholder="250000"
                     min="0"
-                    value={editedCaminhao.proximaManutencaoKm || ""}
-                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, proximaManutencaoKm: parseInt(e.target.value) || 0 })}
+                    value={editedCaminhao.proxima_manutencao_km || ""}
+                    onChange={(e) => setEditedCaminhao({ ...editedCaminhao, proxima_manutencao_km: parseInt(e.target.value) || 0 })}
                   />
                 </div>
               </div>
-              {editedCaminhao.kmAtual !== undefined && editedCaminhao.proximaManutencaoKm !== undefined && editedCaminhao.proximaManutencaoKm > 0 && (
+              {editedCaminhao.km_atual !== undefined && editedCaminhao.proxima_manutencao_km !== undefined && editedCaminhao.proxima_manutencao_km > 0 && (
                 <div className="mt-3 p-3 bg-muted rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-semibold text-muted-foreground">Intervalo de Manutenção</span>
                     <span className="text-sm font-bold text-foreground">
-                      {((editedCaminhao.kmAtual / editedCaminhao.proximaManutencaoKm) * 100).toFixed(0)}%
+                      {((editedCaminhao.km_atual / editedCaminhao.proxima_manutencao_km) * 100).toFixed(0)}%
                     </span>
                   </div>
                   <div className="h-2 bg-muted-foreground/20 rounded-full overflow-hidden">
                     <div
                       className={`h-full ${
-                        (editedCaminhao.kmAtual / editedCaminhao.proximaManutencaoKm) * 100 >= 90
+                        (editedCaminhao.km_atual / editedCaminhao.proxima_manutencao_km) * 100 >= 90
                           ? "bg-red-500"
-                          : (editedCaminhao.kmAtual / editedCaminhao.proximaManutencaoKm) * 100 >= 70
+                          : (editedCaminhao.km_atual / editedCaminhao.proxima_manutencao_km) * 100 >= 70
                           ? "bg-yellow-500"
                           : "bg-green-500"
                       }`}
-                      style={{ width: `${Math.min((editedCaminhao.kmAtual / editedCaminhao.proximaManutencaoKm) * 100, 100)}%` }}
+                      style={{ width: `${Math.min((editedCaminhao.km_atual / editedCaminhao.proxima_manutencao_km) * 100, 100)}%` }}
                     />
                   </div>
                 </div>

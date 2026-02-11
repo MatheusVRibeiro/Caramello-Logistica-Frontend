@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { PeriodoFilter } from "@/components/shared/PeriodoFilter";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable } from "@/components/shared/DataTable";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +58,11 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import pagamentosService from "@/services/pagamentos";
+import * as motoristasService from "@/services/motoristas";
+import * as fretesService from "@/services/fretes";
+import { usePeriodoFilter } from "@/hooks/usePeriodoFilter";
+import type { Pagamento, CriarPagamentoPayload, AtualizarPagamentoPayload, Motorista, Frete } from "@/types";
 
 /**
  * Página de Pagamentos - Gestão de Pagamentos Semanais aos Motoristas
@@ -331,6 +338,86 @@ const statusConfig = {
 };
 
 export default function Pagamentos() {
+  const queryClient = useQueryClient();
+
+  const { data: pagamentosResponse, isLoading: isLoadingPagamentos } = useQuery({
+    queryKey: ["pagamentos"],
+    queryFn: pagamentosService.listarPagamentos,
+  });
+
+  const { data: motoristasResponse } = useQuery({
+    queryKey: ["motoristas"],
+    queryFn: motoristasService.listarMotoristas,
+  });
+
+  const { data: fretesResponse } = useQuery({
+    queryKey: ["fretes"],
+    queryFn: fretesService.listarFretes,
+  });
+
+  const pagamentosApi: Pagamento[] = pagamentosResponse?.data || [];
+  const motoristasApi: Motorista[] = motoristasResponse?.data || [];
+  const fretesApi: Frete[] = fretesResponse?.data || [];
+
+  // Funções de formatação
+  const formatDateBR = (value: string) => {
+    if (!value) return "";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return format(parsed, "dd/MM/yyyy", { locale: ptBR });
+  };
+
+  const toApiDate = (value: string) => {
+    if (!value) return "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const parsed = parse(value, "dd/MM/yyyy", new Date());
+    return Number.isNaN(parsed.getTime()) ? value : format(parsed, "yyyy-MM-dd");
+  };
+
+  // Hook para filtro de período
+  const {
+    tipoVisualizacao,
+    selectedPeriodo,
+    periodosDisponiveis,
+    dadosFiltrados: pagamentosFiltrados,
+    formatPeriodoLabel,
+    setTipoVisualizacao,
+    setSelectedPeriodo,
+  } = usePeriodoFilter({
+    data: pagamentosApi,
+    getDataField: (p) => p.data_pagamento,
+  });
+
+  // Transformar dados filtrados para PagamentoMotorista
+  const pagamentosFiltradosTransformados = useMemo(
+    () =>
+      pagamentosFiltrados.map((pagamento) => ({
+        id: pagamento.id,
+        motoristaId: pagamento.motorista_id,
+        motoristaNome: pagamento.motorista_nome,
+        dataFrete: pagamento.periodo_fretes,
+        toneladas: Number(pagamento.total_toneladas) || 0,
+        fretes: Number(pagamento.quantidade_fretes) || 0,
+        valorUnitarioPorTonelada: Number(pagamento.valor_por_tonelada) || 0,
+        valorTotal: Number(pagamento.valor_total) || 0,
+        fretesSelecionados: pagamento.fretes_incluidos
+          ? pagamento.fretes_incluidos.split(",")
+          : [],
+        dataPagamento: formatDateBR(pagamento.data_pagamento),
+        statusPagamento: pagamento.status,
+        metodoPagamento: pagamento.metodo_pagamento,
+        comprovante: pagamento.comprovante_nome
+          ? {
+              nome: pagamento.comprovante_nome,
+              url: pagamento.comprovante_url || "",
+              datadoUpload: pagamento.comprovante_data_upload || "",
+            }
+          : undefined,
+        observacoes: pagamento.observacoes || undefined,
+      })),
+    [pagamentosFiltrados]
+  );
+
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [motoristaFilter, setMotoristaFilter] = useState<string>("all");
@@ -341,9 +428,67 @@ export default function Pagamentos() {
   const [dataPagamentoSelected, setDataPagamentoSelected] = useState<Date | undefined>();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFretes, setSelectedFretes] = useState<string[]>([]);
+
+  const motoristas = useMemo(
+    () =>
+      motoristasApi.map((motorista) => ({
+        id: motorista.id,
+        nome: motorista.nome,
+        tipoPagamento: motorista.tipo_pagamento || "pix",
+        chavePixTipo: motorista.chave_pix_tipo,
+        chavePix: motorista.chave_pix,
+        banco: motorista.banco,
+        agencia: motorista.agencia,
+        conta: motorista.conta,
+        tipoConta: motorista.tipo_conta,
+      })),
+    [motoristasApi]
+  );
+
+  const fretesData = useMemo(
+    () =>
+      fretesApi.map((frete) => ({
+        id: frete.id,
+        motoristaId: frete.motorista_id,
+        dataFrete: formatDateBR(frete.data_frete),
+        rota: `${frete.origem} → ${frete.destino}`,
+        toneladas: Number(frete.toneladas) || 0,
+        valorGerado: Number(frete.receita ?? frete.toneladas * frete.valor_por_tonelada) || 0,
+        pagamentoId: frete.pagamento_id ?? null,
+      })),
+    [fretesApi]
+  );
+
+  const pagamentosData = useMemo(
+    () =>
+      pagamentosApi.map((pagamento) => ({
+        id: pagamento.id,
+        motoristaId: pagamento.motorista_id,
+        motoristaNome: pagamento.motorista_nome,
+        dataFrete: pagamento.periodo_fretes,
+        toneladas: pagamento.total_toneladas,
+        fretes: Number(pagamento.quantidade_fretes) || 0,
+        valorUnitarioPorTonelada: Number(pagamento.valor_por_tonelada) || 0,
+        valorTotal: Number(pagamento.valor_total) || 0,
+        fretesSelecionados: pagamento.fretes_incluidos
+          ? pagamento.fretes_incluidos.split(",")
+          : [],
+        dataPagamento: formatDateBR(pagamento.data_pagamento),
+        statusPagamento: pagamento.status,
+        metodoPagamento: pagamento.metodo_pagamento,
+        comprovante: pagamento.comprovante_nome
+          ? {
+              nome: pagamento.comprovante_nome,
+              url: pagamento.comprovante_url || "",
+              datadoUpload: pagamento.comprovante_data_upload || "",
+            }
+          : undefined,
+        observacoes: pagamento.observacoes || undefined,
+      })),
+    [pagamentosApi]
+  );
   
-  // Novos estados para Exercício (Ano/Mês) e Fechamento
-  const [selectedPeriodo, setSelectedPeriodo] = useState("2026-01"); // Janeiro 2026
+  // Estados para Fechamento
   const [mesesFechados, setMesesFechados] = useState<string[]>([]); // Meses que já foram fechados
   
   // Dados históricos para comparação (simulado - mes anterior)
@@ -352,6 +497,39 @@ export default function Pagamentos() {
     totalPago: 21500, // Dezembro 2025 pagou R$ 21.500
     totalMotoristas: 4,
   };
+
+  const createMutation = useMutation({
+    mutationFn: pagamentosService.criarPagamento,
+    onSuccess: (response) => {
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: ["pagamentos"] });
+        toast.success("Pagamento registrado com sucesso!");
+        setIsModalOpen(false);
+      } else {
+        toast.error(response.message || "Erro ao criar pagamento");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Erro ao criar pagamento");
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: AtualizarPagamentoPayload }) =>
+      pagamentosService.atualizarPagamento(id, data),
+    onSuccess: (response) => {
+      if (response.success) {
+        queryClient.invalidateQueries({ queryKey: ["pagamentos"] });
+        toast.success("Pagamento atualizado com sucesso!");
+        setIsModalOpen(false);
+      } else {
+        toast.error(response.message || "Erro ao atualizar pagamento");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Erro ao atualizar pagamento");
+    },
+  });
 
   const handleOpenNewModal = () => {
     setEditedPagamento({
@@ -445,6 +623,27 @@ export default function Pagamentos() {
     }
   };
 
+  const buildPeriodoFretes = (freteIds: string[]) => {
+    const datas = freteIds
+      .map((id) => fretesData.find((f) => f.id === id)?.dataFrete)
+      .filter((value): value is string => !!value)
+      .map((value) => parse(value, "dd/MM/yyyy", new Date()))
+      .filter((value) => !Number.isNaN(value.getTime()));
+
+    if (datas.length === 0) return "";
+
+    const sorted = datas.sort((a, b) => a.getTime() - b.getTime());
+    const inicio = sorted[0];
+    const fim = sorted[sorted.length - 1];
+
+    const mesmoMes = inicio.getMonth() === fim.getMonth() && inicio.getFullYear() === fim.getFullYear();
+    if (mesmoMes) {
+      return `${format(inicio, "dd")}-${format(fim, "dd")}/${format(inicio, "MM/yyyy")}`;
+    }
+
+    return `${format(inicio, "dd/MM/yyyy")} - ${format(fim, "dd/MM/yyyy")}`;
+  };
+
   const handleSave = () => {
     if (!editedPagamento.motoristaId) {
       toast.error("Selecione um motorista");
@@ -456,15 +655,28 @@ export default function Pagamentos() {
       return;
     }
 
-    if (isEditing) {
-      toast.success("Pagamento atualizado com sucesso!");
+    const payload: CriarPagamentoPayload = {
+      motorista_id: editedPagamento.motoristaId,
+      motorista_nome: editedPagamento.motoristaNome || "",
+      periodo_fretes: buildPeriodoFretes(selectedFretes) || editedPagamento.dataFrete || "",
+      quantidade_fretes: selectedFretes.length,
+      fretes_incluidos: selectedFretes.join(","),
+      total_toneladas: editedPagamento.toneladas || 0,
+      valor_por_tonelada: editedPagamento.valorUnitarioPorTonelada || 0,
+      valor_total: editedPagamento.valorTotal || 0,
+      data_pagamento: toApiDate(editedPagamento.dataPagamento || ""),
+      status: editedPagamento.statusPagamento || "pendente",
+      metodo_pagamento: editedPagamento.metodoPagamento || "pix",
+      comprovante_nome: selectedFile?.name,
+      comprovante_url: editedPagamento.comprovante?.url,
+      observacoes: editedPagamento.observacoes,
+    };
+
+    if (isEditing && editedPagamento.id) {
+      updateMutation.mutate({ id: editedPagamento.id, data: payload });
     } else {
-      toast.success("Pagamento registrado com sucesso!");
-      if (selectedFile) {
-        toast.success(`Comprovante "${selectedFile.name}" anexado!`);
-      }
+      createMutation.mutate(payload);
     }
-    setIsModalOpen(false);
   };
 
   // Função para fechar/abrir o mês
@@ -478,6 +690,18 @@ export default function Pagamentos() {
       toast.success(`Mês ${selectedPeriodo} fechado com sucesso!`);
     }
   };
+
+  // Filtrar dados com base em busca e filtros
+  const filteredData = pagamentosFiltradosTransformados.filter((pagamento) => {
+    const matchesSearch =
+      pagamento.motoristaNome.toLowerCase().includes(search.toLowerCase()) ||
+      pagamento.id.includes(search);
+    const matchesStatus =
+      statusFilter === "all" || pagamento.statusPagamento === statusFilter;
+    const matchesMotorista =
+      motoristaFilter === "all" || pagamento.motoristaId === motoristaFilter;
+    return matchesSearch && matchesStatus && matchesMotorista;
+  });
 
   // Função para exportar PDF profissional e completo
   const handleExportarPDF = () => {
@@ -836,26 +1060,6 @@ export default function Pagamentos() {
     toast.success(`PDF "${nomeArquivo}" gerado com sucesso!`, { duration: 4000 });
   };
 
-  // Filtrar dados por período selecionado
-  const dadosFiltradosPorPeriodo = useMemo(() => {
-    return pagamentosData.filter((p) => {
-      const [dia, mes, ano] = p.dataPagamento.split("/");
-      const periodoItem = `${ano}-${mes}`;
-      return periodoItem === selectedPeriodo;
-    });
-  }, [selectedPeriodo]);
-
-  const filteredData = dadosFiltradosPorPeriodo.filter((pagamento) => {
-    const matchesSearch =
-      pagamento.motoristaNome.toLowerCase().includes(search.toLowerCase()) ||
-      pagamento.id.includes(search);
-    const matchesStatus =
-      statusFilter === "all" || pagamento.statusPagamento === statusFilter;
-    const matchesMotorista =
-      motoristaFilter === "all" || pagamento.motoristaId === motoristaFilter;
-    return matchesSearch && matchesStatus && matchesMotorista;
-  });
-
   const columns = [
     {
       key: "id",
@@ -906,7 +1110,7 @@ export default function Pagamentos() {
         <div className="flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-profit" />
           <span className="font-bold text-profit">
-            R$ {item.valorTotal.toLocaleString("pt-BR")}
+            R$ {item.valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
         </div>
       ),
@@ -962,6 +1166,19 @@ export default function Pagamentos() {
     ? fretesData.filter((f) => selectedPagamento.fretesSelecionados?.includes(f.id))
     : [];
 
+  if (isLoadingPagamentos) {
+    return (
+      <MainLayout title="Pagamentos" subtitle="Registro de pagamentos de motoristas">
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground">Carregando pagamentos...</p>
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout title="Pagamentos" subtitle="Registro de pagamentos de motoristas">
       <PageHeader
@@ -969,23 +1186,14 @@ export default function Pagamentos() {
         description="Registre e acompanhe os pagamentos pelos fretes realizados"
         actions={
           <div className="flex items-center gap-3">
-            {/* Seletor de Exercício (Ano/Mês) */}
-            <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground whitespace-nowrap">Exercício:</Label>
-              <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Selecione o mês" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2025-11">Novembro 2025</SelectItem>
-                  <SelectItem value="2025-12">Dezembro 2025</SelectItem>
-                  <SelectItem value="2026-01">Janeiro 2026</SelectItem>
-                  <SelectItem value="2026-02">Fevereiro 2026</SelectItem>
-                  <SelectItem value="2026-03">Março 2026</SelectItem>
-                  <SelectItem value="2027-01">Janeiro 2027</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <PeriodoFilter
+              tipoVisualizacao={tipoVisualizacao}
+              selectedPeriodo={selectedPeriodo}
+              periodosDisponiveis={periodosDisponiveis}
+              formatPeriodoLabel={formatPeriodoLabel}
+              onTipoChange={setTipoVisualizacao}
+              onPeriodoChange={setSelectedPeriodo}
+            />
 
             {/* Botão Fechar/Abrir Mês */}
             <Button
@@ -1040,9 +1248,9 @@ export default function Pagamentos() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total de Registros</p>
-              <p className="text-4xl font-bold mt-2 text-foreground">{dadosFiltradosPorPeriodo.length}</p>
+              <p className="text-4xl font-bold mt-2 text-foreground">{pagamentosFiltradosTransformados.length}</p>
               <p className="text-xs text-primary mt-2 flex items-center gap-1">
-                {dadosFiltradosPorPeriodo.length === 0 ? "Nenhum pagamento neste período" : "Pagamentos cadastrados"}
+                {pagamentosFiltradosTransformados.length === 0 ? "Nenhum pagamento neste período" : "Pagamentos cadastrados"}
               </p>
             </div>
             <FileText className="h-12 w-12 text-primary/20" />
@@ -1054,13 +1262,13 @@ export default function Pagamentos() {
             <div>
               <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-300 uppercase tracking-wide">Pendente de Pagamento</p>
               <p className="text-4xl font-bold mt-2 text-yellow-700 dark:text-yellow-400">
-                R$ {dadosFiltradosPorPeriodo
+                R$ {pagamentosFiltradosTransformados
                   .filter((p) => p.statusPagamento === "pendente")
                   .reduce((acc, p) => acc + p.valorTotal, 0)
-                  .toLocaleString("pt-BR")}
+                  .toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2 flex items-center gap-1">
-                {dadosFiltradosPorPeriodo.filter(p => p.statusPagamento === "pendente").length} pagamentos
+                {pagamentosFiltradosTransformados.filter(p => p.statusPagamento === "pendente").length} pagamentos
               </p>
             </div>
             <Clock className="h-12 w-12 text-yellow-600/20" />
@@ -1072,17 +1280,17 @@ export default function Pagamentos() {
             <div>
               <p className="text-xs font-semibold text-profit/70 uppercase tracking-wide">Já Pago</p>
               <p className="text-4xl font-bold mt-2 text-profit">
-                R$ {dadosFiltradosPorPeriodo
+                R$ {pagamentosFiltradosTransformados
                   .filter((p) => p.statusPagamento === "pago")
                   .reduce((acc, p) => acc + p.valorTotal, 0)
-                  .toLocaleString("pt-BR")}
+                  .toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
               <div className="flex items-center gap-2 mt-2">
                 <p className="text-xs text-profit/70 flex items-center gap-1">
-                  {dadosFiltradosPorPeriodo.filter(p => p.statusPagamento === "pago").length} pagamentos
+                  {pagamentosFiltradosTransformados.filter(p => p.statusPagamento === "pago").length} pagamentos
                 </p>
                 {(() => {
-                  const totalAtual = dadosFiltradosPorPeriodo
+                  const totalAtual = pagamentosFiltradosTransformados
                     .filter((p) => p.statusPagamento === "pago")
                     .reduce((acc, p) => acc + p.valorTotal, 0);
                   const variacao = dadosMesAnterior.totalPago > 0
@@ -1280,7 +1488,7 @@ export default function Pagamentos() {
                               
                               <div className="bg-background p-3 rounded border border-blue-200 dark:border-blue-900">
                                 <p className="text-sm font-semibold text-blue-600">
-                                  R$ {frete.valorGerado.toLocaleString("pt-BR")}
+                                  R$ {frete.valorGerado.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </p>
                               </div>
 
@@ -1292,20 +1500,20 @@ export default function Pagamentos() {
                                       <div key={idx} className="flex items-center justify-between text-sm bg-loss/5 p-2 rounded">
                                         <span className="text-muted-foreground">• {custo.descricao}</span>
                                         <span className="font-semibold text-loss">
-                                          -R$ {custo.valor.toLocaleString("pt-BR")}
+                                          -R$ {custo.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                       </div>
                                     ))}
                                     <div className="flex items-center justify-between text-xs font-semibold pt-2 border-t border-loss/20">
                                       <span className="text-loss">Total de Descontos:</span>
-                                      <span className="text-loss">-R$ {totalCustos.toLocaleString("pt-BR")}</span>
+                                      <span className="text-loss">-R$ {totalCustos.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                     </div>
                                   </div>
 
                                   <div className="bg-profit/5 border border-profit/20 p-3 rounded">
                                     <p className="text-xs text-muted-foreground mb-1">Valor Líquido (após descontos)</p>
                                     <p className="text-lg font-bold text-profit">
-                                      R$ {valorLiquido.toLocaleString("pt-BR")}
+                                      R$ {valorLiquido.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </p>
                                   </div>
                                 </>
@@ -1327,7 +1535,7 @@ export default function Pagamentos() {
                     <Card className="p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
                       <p className="text-xs text-muted-foreground mb-1">Valor Bruto (Fretes)</p>
                       <p className="text-2xl font-bold text-blue-600">
-                        R$ {fretesDoPagamento.reduce((acc, f) => acc + f.valorGerado, 0).toLocaleString("pt-BR")}
+                        R$ {fretesDoPagamento.reduce((acc, f) => acc + f.valorGerado, 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
                     <Card className="p-4 bg-loss/10 border-loss/20">
@@ -1342,13 +1550,13 @@ export default function Pagamentos() {
                                 .reduce((sum, c) => sum + c.valor, 0)
                             );
                           }, 0)
-                          .toLocaleString("pt-BR")}
+                          .toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
                     <Card className="p-4 bg-profit/5 border-profit/20">
                       <p className="text-xs text-muted-foreground mb-1">Valor Líquido a Pagar</p>
                       <p className="text-2xl font-bold text-profit">
-                        R$ {(selectedPagamento.valorTotal || 0).toLocaleString("pt-BR")}
+                        R$ {(selectedPagamento.valorTotal || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </Card>
                   </div>
@@ -1360,7 +1568,7 @@ export default function Pagamentos() {
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Valor Total a Pagar</p>
                       <p className="text-4xl font-bold text-profit">
-                        R$ {selectedPagamento.valorTotal.toLocaleString("pt-BR")}
+                        R$ {selectedPagamento.valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                     <DollarSign className="h-16 w-16 text-profit/20" />

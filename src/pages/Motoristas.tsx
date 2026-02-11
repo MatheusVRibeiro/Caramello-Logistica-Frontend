@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -9,6 +9,9 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { InputMascarado } from "@/components/InputMascarado";
+import { validarCPF, validarEmail, validarCNH, validarTelefone, apenasNumeros, formatarDataBrasileira, converterDataBrasileira, formatarCPF, formatarTelefone } from "@/utils/formatters";
+import * as motoristasService from "@/services/motoristas";
 import {
   Select,
   SelectContent,
@@ -27,31 +30,28 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Plus, TrendingUp, Phone, Mail, Calendar, Truck, Edit, Save, X, MapPin, Award, CreditCard, Users, UserCheck, UserX, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import type { Motorista } from "@/types";
 
-interface Motorista {
-  id: string;
+// Payload para criar motorista
+interface CriarMotoristaPayload {
   nome: string;
   cpf: string;
   telefone: string;
   email: string;
   cnh: string;
-  cnhValidade: string;
-  cnhCategoria?: "A" | "B" | "C" | "D" | "E";
-  status: "ativo" | "inativo" | "ferias";
+  cnh_validade: string;
+  cnh_categoria: "A" | "B" | "C" | "D" | "E";
   tipo: "proprio" | "terceirizado";
-  receitaGerada: number;
-  viagensRealizadas: number;
-  dataAdmissao: string;
-  caminhaoAtual?: string;
+  data_admissao: string;
   endereco?: string;
-  // Dados Bancários
-  tipoPagamento?: "pix" | "transferencia_bancaria";
-  chavePixTipo?: "cpf" | "email" | "telefone" | "aleatoria";
-  chavePix?: string;
+  status?: "ativo" | "inativo" | "ferias";
+  tipo_pagamento?: "pix" | "transferencia_bancaria";
+  chave_pix_tipo?: "cpf" | "email" | "telefone" | "aleatoria";
+  chave_pix?: string;
   banco?: string;
   agencia?: string;
   conta?: string;
-  tipoConta?: "corrente" | "poupanca";
+  tipo_conta?: "corrente" | "poupanca";
 }
 
 // Lista de caminhões disponíveis (simulado)
@@ -61,112 +61,6 @@ const caminhoes = [
   { placa: "DEF-9012", modelo: "Mercedes-Benz Actros" },
   { placa: "GHI-3456", modelo: "Iveco Stralis" },
   { placa: "JKL-7890", modelo: "DAF XF" },
-];
-
-const motoristasData: Motorista[] = [
-  {
-    id: "1",
-    nome: "Carlos Silva",
-    cpf: "123.456.789-00",
-    telefone: "(11) 98765-4321",
-    email: "carlos.silva@email.com",
-    cnh: "12345678900",
-    cnhValidade: "15/08/2027",
-    cnhCategoria: "E",
-    status: "ativo",
-    tipo: "proprio",
-    receitaGerada: 89500,
-    viagensRealizadas: 24,
-    dataAdmissao: "15/03/2020",
-    caminhaoAtual: "ABC-1234",
-    endereco: "São Paulo, SP",
-    tipoPagamento: "pix",
-    chavePixTipo: "cpf",
-    chavePix: "123.456.789-00",
-  },
-  {
-    id: "2",
-    nome: "João Oliveira",
-    cpf: "234.567.890-11",
-    telefone: "(21) 97654-3210",
-    email: "joao.oliveira@email.com",
-    cnh: "23456789011",
-    cnhValidade: "22/10/2026",
-    cnhCategoria: "E",
-    status: "ativo",
-    tipo: "terceirizado",
-    receitaGerada: 78200,
-    viagensRealizadas: 21,
-    dataAdmissao: "22/08/2019",
-    caminhaoAtual: "XYZ-5678",
-    endereco: "Rio de Janeiro, RJ",
-    tipoPagamento: "transferencia_bancaria",
-    banco: "Banco do Brasil",
-    agencia: "1234",
-    conta: "567890-1",
-    tipoConta: "corrente",
-  },
-  {
-    id: "3",
-    nome: "Pedro Santos",
-    cpf: "345.678.901-22",
-    telefone: "(41) 96543-2109",
-    email: "pedro.santos@email.com",
-    cnh: "34567890122",
-    cnhValidade: "10/05/2028",
-    cnhCategoria: "E",
-    status: "ferias",
-    tipo: "proprio",
-    receitaGerada: 72100,
-    viagensRealizadas: 19,
-    dataAdmissao: "10/01/2021",
-    caminhaoAtual: "DEF-9012",
-    endereco: "Curitiba, PR",
-    tipoPagamento: "pix",
-    chavePixTipo: "email",
-    chavePix: "pedro.santos@email.com",
-  },
-  {
-    id: "4",
-    nome: "André Costa",
-    cpf: "456.789.012-33",
-    telefone: "(31) 95432-1098",
-    email: "andre.costa@email.com",
-    cnh: "45678901233",
-    cnhValidade: "05/12/2025",
-    cnhCategoria: "E",
-    status: "ativo",
-    tipo: "terceirizado",
-    receitaGerada: 65800,
-    viagensRealizadas: 17,
-    dataAdmissao: "05/06/2022",
-    caminhaoAtual: "GHI-3456",
-    endereco: "Belo Horizonte, MG",
-    tipoPagamento: "pix",
-    chavePixTipo: "aleatoria",
-    chavePix: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  },
-  {
-    id: "5",
-    nome: "Lucas Ferreira",
-    cpf: "567.890.123-44",
-    telefone: "(48) 94321-0987",
-    email: "lucas.ferreira@email.com",
-    cnh: "56789012344",
-    cnhValidade: "18/03/2024",
-    cnhCategoria: "E",
-    status: "inativo",
-    tipo: "proprio",
-    receitaGerada: 58400,
-    viagensRealizadas: 15,
-    dataAdmissao: "18/11/2018",
-    endereco: "Florianópolis, SC",
-    tipoPagamento: "transferencia_bancaria",
-    banco: "Caixa Econômica Federal",
-    agencia: "5678",
-    conta: "123456-9",
-    tipoConta: "poupanca",
-  },
 ];
 
 const statusConfig = {
@@ -188,6 +82,34 @@ export default function Motoristas() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedMotorista, setEditedMotorista] = useState<Partial<Motorista>>({});
+  const [motoristasState, setMotoristasState] = useState<Motorista[]>([]);
+  const [isLoadingMotoristas, setIsLoadingMotoristas] = useState(true);
+  const [errosCampos, setErrosCampos] = useState<Record<string, string>>({});
+
+  // Carregar motoristas da API
+  useEffect(() => {
+    carregarMotoristas();
+  }, []);
+
+  const carregarMotoristas = async () => {
+    setIsLoadingMotoristas(true);
+    try {
+      const res = await motoristasService.listarMotoristas();
+      
+      if (res.success && Array.isArray(res.data)) {
+        setMotoristasState(res.data);
+        toast.success(`${res.data.length} motoristas carregados`);
+      } else {
+        setMotoristasState([]);
+        toast.error(res.message || "Erro ao carregar motoristas");
+      }
+    } catch (error) {
+      console.error("Erro ao carregar motoristas:", error);
+      setMotoristasState([]);
+      toast.error("Erro ao conectar com a API. Verifique se o backend está rodando.");
+    }
+    setIsLoadingMotoristas(false);
+  };
 
   const handleOpenNewModal = () => {
     setEditedMotorista({
@@ -196,39 +118,230 @@ export default function Motoristas() {
       telefone: "",
       email: "",
       cnh: "",
-      cnhValidade: "",
+      cnh_validade: "",
+      cnh_categoria: "D",
       status: "ativo",
       tipo: "proprio",
-      caminhaoAtual: "",
+      caminhao_atual: "",
       endereco: "",
-      tipoPagamento: "pix",
-      chavePixTipo: "cpf",
-      chavePix: "",
+      data_admissao: new Date().toISOString().split('T')[0], // formato YYYY-MM-DD
+      tipo_pagamento: "pix",
+      chave_pix_tipo: "cpf",
+      chave_pix: "",
       banco: "",
       agencia: "",
       conta: "",
-      tipoConta: "corrente",
+      tipo_conta: "corrente",
     });
     setIsEditing(false);
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (motorista: Motorista) => {
-    setEditedMotorista(motorista);
+    // Normalizar data para formato YYYY-MM-DD se necessário
+    const dataNormalizada = motorista.data_admissao 
+      ? motorista.data_admissao.length > 10 
+        ? motorista.data_admissao.split('T')[0] 
+        : motorista.data_admissao
+      : new Date().toISOString().split('T')[0];
+    
+    setEditedMotorista({
+      ...motorista,
+      data_admissao: dataNormalizada,
+      cnh_validade: motorista.cnh_validade?.length > 10 
+        ? motorista.cnh_validade.split('T')[0]
+        : motorista.cnh_validade
+    });
     setIsEditing(true);
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Resetar erros
+    const novosErros: Record<string, string> = {};
+
+    // Validar campos obrigatórios
+    if (!editedMotorista.nome?.trim()) {
+      novosErros.nome = "Nome é obrigatório";
+    }
+
+    if (!editedMotorista.cpf?.trim()) {
+      novosErros.cpf = "CPF é obrigatório";
+    } else {
+      const cpfLimpo = apenasNumeros(editedMotorista.cpf);
+      if (!validarCPF(cpfLimpo)) {
+        novosErros.cpf = "CPF inválido";
+      } else {
+        // Verificar CPF duplicado
+        const cpfExiste = motoristasState.some(
+          m => apenasNumeros(m.cpf) === cpfLimpo && m.id !== editedMotorista.id
+        );
+        if (cpfExiste) {
+          novosErros.cpf = "Este CPF já está cadastrado";
+        }
+      }
+    }
+
+    if (!editedMotorista.telefone?.trim()) {
+      novosErros.telefone = "Telefone é obrigatório";
+    } else {
+      const telefoneLimpo = apenasNumeros(editedMotorista.telefone);
+      if (!validarTelefone(telefoneLimpo)) {
+        novosErros.telefone = "Telefone inválido";
+      }
+    }
+
+    if (!editedMotorista.email?.trim()) {
+      novosErros.email = "E-mail é obrigatório";
+    } else if (!validarEmail(editedMotorista.email)) {
+      novosErros.email = "E-mail inválido";
+    } else {
+      // Verificar email duplicado
+      const emailExiste = motoristasState.some(
+        m => m.email.toLowerCase() === editedMotorista.email?.toLowerCase() && m.id !== editedMotorista.id
+      );
+      if (emailExiste) {
+        novosErros.email = "Este e-mail já está cadastrado";
+      }
+    }
+
+    if (!editedMotorista.cnh?.trim()) {
+      novosErros.cnh = "CNH é obrigatória";
+    } else if (!validarCNH(editedMotorista.cnh)) {
+      novosErros.cnh = "CNH deve ter 11 dígitos";
+    } else {
+      // Verificar CNH duplicada
+      const cnhExiste = motoristasState.some(
+        m => m.cnh === editedMotorista.cnh && m.id !== editedMotorista.id
+      );
+      if (cnhExiste) {
+        novosErros.cnh = "Esta CNH já está cadastrada";
+      }
+    }
+
+    if (!editedMotorista.cnh_validade) {
+      novosErros.cnh_validade = "Validade da CNH é obrigatória";
+    } else {
+      // Verificar se a CNH está válida
+      const dataValidade = new Date(editedMotorista.cnh_validade);
+      const hoje = new Date();
+      if (dataValidade < hoje) {
+        novosErros.cnh_validade = "CNH vencida";
+      }
+    }
+
+    if (!editedMotorista.cnh_categoria) {
+      novosErros.cnh_categoria = "Categoria da CNH é obrigatória";
+    }
+
+    if (!editedMotorista.tipo) {
+      novosErros.tipo = "Tipo de motorista é obrigatório";
+    }
+
+    if (!editedMotorista.data_admissao) {
+      novosErros.data_admissao = "Data de admissão é obrigatória";
+    }
+
+    // Validar dados bancários se preenchidos
+    if (editedMotorista.tipo_pagamento === "pix") {
+      if (!editedMotorista.chave_pix?.trim()) {
+        novosErros.chave_pix = "Chave PIX é obrigatória";
+      } else if (editedMotorista.chave_pix_tipo === "cpf" && !validarCPF(apenasNumeros(editedMotorista.chave_pix))) {
+        novosErros.chave_pix = "CPF inválido";
+      } else if (editedMotorista.chave_pix_tipo === "email" && !validarEmail(editedMotorista.chave_pix)) {
+        novosErros.chave_pix = "E-mail inválido";
+      } else if (editedMotorista.chave_pix_tipo === "telefone" && !validarTelefone(apenasNumeros(editedMotorista.chave_pix))) {
+        novosErros.chave_pix = "Telefone inválido";
+      }
+    } else if (editedMotorista.tipo_pagamento === "transferencia_bancaria") {
+      if (!editedMotorista.banco?.trim()) {
+        novosErros.banco = "Banco é obrigatório";
+      }
+      if (!editedMotorista.agencia?.trim()) {
+        novosErros.agencia = "Agência é obrigatória";
+      }
+      if (!editedMotorista.conta?.trim()) {
+        novosErros.conta = "Conta é obrigatória";
+      }
+    }
+
+    // Se houver erros, exibir e retornar
+    if (Object.keys(novosErros).length > 0) {
+      setErrosCampos(novosErros);
+      const primeiroErro = Object.keys(novosErros)[0];
+      const mensagemErro = novosErros[primeiroErro];
+      toast.error(`Erro: ${mensagemErro}`);
+      
+      // Tentar focar no primeiro campo com erro
+      setTimeout(() => {
+        const elemento = document.getElementById(primeiroErro);
+        if (elemento) {
+          elemento.focus();
+          elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+      
+      return;
+    }
+
     if (isEditing) {
       toast.success("Motorista atualizado com sucesso!");
-    } else {
-      toast.success("Motorista cadastrado com sucesso!");
+      setIsModalOpen(false);
+      setErrosCampos({});
+      return;
     }
-    setIsModalOpen(false);
+
+    // Criar payload para API com dados limpos de formatação
+    // IMPORTANTE: A API espera dados sem máscara/formatação
+    const payload: CriarMotoristaPayload = {
+      nome: editedMotorista.nome,
+      cpf: apenasNumeros(editedMotorista.cpf), // Remove formatação (000.000.000-00 -> 00000000000)
+      telefone: apenasNumeros(editedMotorista.telefone), // Remove formatação ((11) 98765-4321 -> 11987654321)
+      email: editedMotorista.email,
+      cnh: apenasNumeros(editedMotorista.cnh), // Remove formatação (apenas números)
+      cnh_validade: editedMotorista.cnh_validade, // Mantém formato de data: YYYY-MM-DD
+      cnh_categoria: editedMotorista.cnh_categoria!,
+      tipo: editedMotorista.tipo!,
+      data_admissao: editedMotorista.data_admissao, // Formato YYYY-MM-DD (normalizador no handleOpenEditModal)
+      endereco: editedMotorista.endereco,
+      status: editedMotorista.status || "ativo",
+      tipo_pagamento: editedMotorista.tipo_pagamento,
+      chave_pix_tipo: editedMotorista.chave_pix_tipo,
+      chave_pix: editedMotorista.chave_pix_tipo === "cpf" ? apenasNumeros(editedMotorista.chave_pix) : editedMotorista.chave_pix, // Limpa se for CPF
+      banco: editedMotorista.banco,
+      agencia: editedMotorista.agencia,
+      conta: editedMotorista.conta,
+      tipo_conta: editedMotorista.tipo_conta,
+    };
+
+    console.log("📤 Payload enviado para API:", payload);
+
+    try {
+      const res = await motoristasService.criarMotorista(payload);
+      
+      if (res.success) {
+        toast.success("Motorista cadastrado com sucesso!");
+        await carregarMotoristas(); // Recarregar lista
+        setIsModalOpen(false);
+        setErrosCampos({});
+      } else {
+        // Tentar identificar qual campo tem erro baseado na mensagem
+        if (res.message?.toLowerCase().includes('cpf')) {
+          setErrosCampos({ cpf: res.message });
+        } else if (res.message?.toLowerCase().includes('email')) {
+          setErrosCampos({ email: res.message });
+        } else if (res.message?.toLowerCase().includes('cnh')) {
+          setErrosCampos({ cnh: res.message });
+        }
+        toast.error(res.message || "Erro ao cadastrar motorista");
+      }
+    } catch (error) {
+      console.error("Erro ao cadastrar motorista:", error);
+      toast.error("Erro ao conectar com a API");
+    }
   };
 
-  const filteredData = motoristasData.filter((motorista) => {
+  const filteredData = motoristasState.filter((motorista) => {
     const matchesSearch =
       motorista.nome.toLowerCase().includes(search.toLowerCase()) ||
       motorista.cpf.includes(search);
@@ -239,11 +352,18 @@ export default function Motoristas() {
     return matchesSearch && matchesStatus && matchesTipo;
   });
 
-  const totalMotoristas = motoristasData.length;
-  const totalAtivos = motoristasData.filter((m) => m.status === "ativo").length;
-  const totalInativos = motoristasData.filter((m) => m.status === "inativo").length;
-  const totalTerceirizados = motoristasData.filter((m) => m.tipo === "terceirizado").length;
-  const receitaTotal = motoristasData.reduce((acc, m) => acc + m.receitaGerada, 0);
+  const totalMotoristas = motoristasState.length;
+  const totalAtivos = motoristasState.filter((m) => m.status === "ativo").length;
+  const totalInativos = motoristasState.filter((m) => m.status === "inativo").length;
+  const totalTerceirizados = motoristasState.filter((m) => m.tipo === "terceirizado").length;
+  const toNumber = (value: number | string | null | undefined) => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined || value === "") return 0;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const receitaTotal = motoristasState.reduce((acc, m) => acc + toNumber(m.receita_gerada), 0);
 
   const columns = [
     {
@@ -271,7 +391,7 @@ export default function Motoristas() {
               />
               <p className="font-semibold text-foreground leading-tight">{item.nome}</p>
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{item.cpf}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{formatarCPF(item.cpf)}</p>
             <div className="mt-1 flex items-center gap-2">
               <Badge variant={statusConfig[item.status].variant} className="text-[10px]">
                 {statusConfig[item.status].label}
@@ -280,11 +400,11 @@ export default function Motoristas() {
                 {tipoMotoristaConfig[item.tipo].label}
               </Badge>
             </div>
-            {item.caminhaoAtual && (
+            {item.caminhao_atual && (
               <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 bg-blue-50 dark:bg-blue-950/40 rounded-md w-fit">
                 <Truck className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                 <p className="text-xs font-mono text-blue-600 dark:text-blue-400 font-semibold">
-                  {item.caminhaoAtual}
+                  {item.caminhao_atual}
                 </p>
               </div>
             )}
@@ -306,7 +426,7 @@ export default function Motoristas() {
           <div className="flex items-center gap-2 text-sm">
             <span className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
               <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-foreground">{item.telefone}</span>
+              <span className="text-foreground">{formatarTelefone(item.telefone)}</span>
             </span>
           </div>
           <div className="flex items-center gap-2 text-xs">
@@ -328,7 +448,7 @@ export default function Motoristas() {
           </Badge>
           <div className="flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Admissão: {item.dataAdmissao}</span>
+            <span className="text-xs text-muted-foreground">Admissão: {formatarDataBrasileira(item.data_admissao)}</span>
           </div>
         </div>
       ),
@@ -341,15 +461,15 @@ export default function Motoristas() {
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-profit" />
             <span className="font-semibold text-profit">
-              R$ {item.receitaGerada.toLocaleString("pt-BR")}
+              R$ {toNumber(item.receita_gerada).toLocaleString("pt-BR")}
             </span>
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Award className="h-4 w-4" />
-            <span>{item.viagensRealizadas} viagens</span>
+            <span>{toNumber(item.viagens_realizadas)} viagens</span>
           </div>
           <div className="text-xs text-muted-foreground">
-            Média/viagem: R$ {Math.round(item.receitaGerada / Math.max(item.viagensRealizadas, 1)).toLocaleString("pt-BR")}
+            Média/viagem: R$ {Math.round(toNumber(item.receita_gerada) / Math.max(toNumber(item.viagens_realizadas), 1)).toLocaleString("pt-BR")}
           </div>
         </div>
       ),
@@ -561,30 +681,30 @@ export default function Motoristas() {
                   <p className="font-mono font-bold text-lg">{selectedMotorista.cnh}</p>
                   <div className="flex items-center gap-3 mt-2">
                     <p className="text-xs text-muted-foreground">
-                      Validade: {selectedMotorista.cnhValidade}
+                      Validade: {formatarDataBrasileira(selectedMotorista.cnh_validade)}
                     </p>
-                    {selectedMotorista.cnhCategoria && (
+                    {selectedMotorista.cnh_categoria && (
                       <>
                         <span className="text-muted-foreground">•</span>
                         <Badge variant="outline" className="text-xs">
-                          Categoria {selectedMotorista.cnhCategoria}
+                          Categoria {selectedMotorista.cnh_categoria}
                         </Badge>
                       </>
                     )}
                   </div>
                 </Card>
 
-                {selectedMotorista.caminhaoAtual && (
+                {selectedMotorista.caminhao_atual && (
                   <Card className="p-4 border-l-4 border-l-blue-500">
                     <div className="flex items-center gap-2 mb-2">
                       <Truck className="h-4 w-4 text-blue-600" />
                       <p className="text-sm text-muted-foreground">Caminhão Atual</p>
                     </div>
                     <p className="font-mono font-bold text-lg text-blue-600">
-                      {selectedMotorista.caminhaoAtual}
+                      {selectedMotorista.caminhao_atual}
                     </p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      {caminhoes.find(c => c.placa === selectedMotorista.caminhaoAtual)?.modelo}
+                      {caminhoes.find(c => c.placa === selectedMotorista.caminhao_atual)?.modelo}
                     </p>
                   </Card>
                 )}
@@ -597,18 +717,18 @@ export default function Motoristas() {
                 <Card className="p-4 bg-profit/5 border-profit/20">
                   <p className="text-sm text-muted-foreground mb-2">Receita Gerada</p>
                   <p className="text-2xl font-bold text-profit">
-                    R$ {selectedMotorista.receitaGerada.toLocaleString("pt-BR")}
+                    R$ {toNumber(selectedMotorista.receita_gerada).toLocaleString("pt-BR")}
                   </p>
                 </Card>
                 <Card className="p-4 bg-primary/5 border-primary/20">
                   <p className="text-sm text-muted-foreground mb-2">Viagens</p>
                   <p className="text-2xl font-bold text-primary">
-                    {selectedMotorista.viagensRealizadas}
+                    {toNumber(selectedMotorista.viagens_realizadas)}
                   </p>
                 </Card>
                 <Card className="p-4 bg-muted/50">
                   <p className="text-sm text-muted-foreground mb-2">Admissão</p>
-                  <p className="text-lg font-bold">{selectedMotorista.dataAdmissao}</p>
+                  <p className="text-lg font-bold">{formatarDataBrasileira(selectedMotorista.data_admissao)}</p>
                 </Card>
               </div>
 
@@ -647,22 +767,22 @@ export default function Motoristas() {
                   <CreditCard className="h-4 w-4" />
                   Dados Bancários / PIX
                 </h4>
-                {selectedMotorista.tipoPagamento === "pix" ? (
+                {selectedMotorista.tipo_pagamento === "pix" ? (
                   <Card className="p-4 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900">
                     <div className="space-y-3">
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Tipo de Chave PIX</p>
                         <p className="font-semibold">
-                          {selectedMotorista.chavePixTipo === "cpf" && "CPF"}
-                          {selectedMotorista.chavePixTipo === "email" && "E-mail"}
-                          {selectedMotorista.chavePixTipo === "telefone" && "Telefone"}
-                          {selectedMotorista.chavePixTipo === "aleatoria" && "Chave Aleatória"}
+                          {selectedMotorista.chave_pix_tipo === "cpf" && "CPF"}
+                          {selectedMotorista.chave_pix_tipo === "email" && "E-mail"}
+                          {selectedMotorista.chave_pix_tipo === "telefone" && "Telefone"}
+                          {selectedMotorista.chave_pix_tipo === "aleatoria" && "Chave Aleatória"}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Chave PIX</p>
                         <p className="font-mono bg-white dark:bg-slate-900 p-2 rounded border border-green-200 dark:border-green-900 break-all">
-                          {selectedMotorista.chavePix}
+                          {selectedMotorista.chave_pix}
                         </p>
                       </div>
                     </div>
@@ -685,7 +805,7 @@ export default function Motoristas() {
                       <div>
                         <p className="text-sm text-muted-foreground mb-1">Tipo de Conta</p>
                         <p className="font-semibold">
-                          {selectedMotorista.tipoConta === "corrente" ? "Corrente" : "Poupança"}
+                          {selectedMotorista.tipo_conta === "corrente" ? "Corrente" : "Poupança"}
                         </p>
                       </div>
                     </div>
@@ -720,31 +840,56 @@ export default function Motoristas() {
                   id="nome"
                   placeholder="João Silva"
                   value={editedMotorista.nome || ""}
-                  onChange={(e) => setEditedMotorista({ ...editedMotorista, nome: e.target.value })}
+                  onChange={(e) => {
+                    setEditedMotorista({ ...editedMotorista, nome: e.target.value });
+                    setErrosCampos({ ...errosCampos, nome: "" });
+                  }}
+                  className={errosCampos.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
+                {errosCampos.nome && (
+                  <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.nome}</p>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="cpf">CPF *</Label>
-                <Input
-                  id="cpf"
-                  placeholder="000.000.000-00"
-                  value={editedMotorista.cpf || ""}
-                  onChange={(e) => setEditedMotorista({ ...editedMotorista, cpf: e.target.value })}
-                />
-              </div>
+              <InputMascarado
+                label="CPF *"
+                id="cpf"
+                tipoMascara="cpf"
+                placeholder="000.000.000-00"
+                value={editedMotorista.cpf || ""}
+                onChange={(e) => {
+                  setEditedMotorista({ ...editedMotorista, cpf: e.target.value });
+                  setErrosCampos({ ...errosCampos, cpf: "" });
+                }}
+                onBlur={(e) => {
+                  const cpfLimpo = apenasNumeros(e.target.value);
+                  if (cpfLimpo && !validarCPF(cpfLimpo)) {
+                    setErrosCampos({ ...errosCampos, cpf: "CPF inválido" });
+                  }
+                }}
+                erro={errosCampos.cpf}
+              />
             </div>
 
             {/* Telefone e Email */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="telefone">Telefone *</Label>
-                <Input
-                  id="telefone"
-                  placeholder="(11) 98765-4321"
-                  value={editedMotorista.telefone || ""}
-                  onChange={(e) => setEditedMotorista({ ...editedMotorista, telefone: e.target.value })}
-                />
-              </div>
+              <InputMascarado
+                label="Telefone *"
+                id="telefone"
+                tipoMascara="telefone"
+                placeholder="(11) 98765-4321"
+                value={editedMotorista.telefone || ""}
+                onChange={(e) => {
+                  setEditedMotorista({ ...editedMotorista, telefone: e.target.value });
+                  setErrosCampos({ ...errosCampos, telefone: "" });
+                }}
+                onBlur={(e) => {
+                  const telefoneLimpo = apenasNumeros(e.target.value);
+                  if (telefoneLimpo && !validarTelefone(telefoneLimpo)) {
+                    setErrosCampos({ ...errosCampos, telefone: "Telefone inválido" });
+                  }
+                }}
+                erro={errosCampos.telefone}
+              />
               <div className="space-y-2">
                 <Label htmlFor="email">E-mail *</Label>
                 <Input
@@ -752,8 +897,20 @@ export default function Motoristas() {
                   type="email"
                   placeholder="motorista@email.com"
                   value={editedMotorista.email || ""}
-                  onChange={(e) => setEditedMotorista({ ...editedMotorista, email: e.target.value })}
+                  onChange={(e) => {
+                    setEditedMotorista({ ...editedMotorista, email: e.target.value });
+                    setErrosCampos({ ...errosCampos, email: "" });
+                  }}
+                  onBlur={(e) => {
+                    if (e.target.value && !validarEmail(e.target.value)) {
+                      setErrosCampos({ ...errosCampos, email: "E-mail inválido" });
+                    }
+                  }}
+                  className={errosCampos.email ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
+                {errosCampos.email && (
+                  <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.email}</p>
+                )}
               </div>
             </div>
 
@@ -761,30 +918,51 @@ export default function Motoristas() {
 
             {/* CNH */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <InputMascarado
+                label="CNH *"
+                id="cnh"
+                tipoMascara="numero"
+                placeholder="00000000000"
+                maxLength={11}
+                value={editedMotorista.cnh || ""}
+                onChange={(e) => {
+                  setEditedMotorista({ ...editedMotorista, cnh: e.target.value });
+                  setErrosCampos({ ...errosCampos, cnh: "" });
+                }}
+                onBlur={(e) => {
+                  if (e.target.value && !validarCNH(e.target.value)) {
+                    setErrosCampos({ ...errosCampos, cnh: "CNH deve ter 11 dígitos" });
+                  }
+                }}
+                erro={errosCampos.cnh}
+              />
               <div className="space-y-2">
-                <Label htmlFor="cnh">CNH *</Label>
+                <Label htmlFor="cnh_validade">Validade CNH *</Label>
                 <Input
-                  id="cnh"
-                  placeholder="00000000000"
-                  value={editedMotorista.cnh || ""}
-                  onChange={(e) => setEditedMotorista({ ...editedMotorista, cnh: e.target.value })}
+                  id="cnh_validade"
+                  type="date"
+                  value={editedMotorista.cnh_validade || ""}
+                  onChange={(e) => {
+                    setEditedMotorista({ ...editedMotorista, cnh_validade: e.target.value });
+                    setErrosCampos({ ...errosCampos, cnh_validade: "" });
+                  }}
+                  className={errosCampos.cnh_validade ? "border-red-500 focus-visible:ring-red-500" : ""}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cnhValidade">Validade CNH *</Label>
-                <Input
-                  id="cnhValidade"
-                  placeholder="DD/MM/AAAA"
-                  value={editedMotorista.cnhValidade || ""}
-                  onChange={(e) => setEditedMotorista({ ...editedMotorista, cnhValidade: e.target.value })}
-                />
+                {editedMotorista.cnh_validade && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    ✓ Data: {formatarDataBrasileira(editedMotorista.cnh_validade)}
+                  </p>
+                )}
+                {errosCampos.cnh_validade && (
+                  <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.cnh_validade}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="cnhCategoria">Categoria CNH *</Label>
                 <Select
-                  value={editedMotorista.cnhCategoria || ""}
+                  value={editedMotorista.cnh_categoria || ""}
                   onValueChange={(value: "A" | "B" | "C" | "D" | "E") => 
-                    setEditedMotorista({ ...editedMotorista, cnhCategoria: value })
+                    setEditedMotorista({ ...editedMotorista, cnh_categoria: value })
                   }
                 >
                   <SelectTrigger>
@@ -808,8 +986,8 @@ export default function Motoristas() {
               <div className="space-y-2">
                 <Label htmlFor="caminhao">Caminhão Vinculado</Label>
                 <Select
-                  value={editedMotorista.caminhaoAtual || "none"}
-                  onValueChange={(value) => setEditedMotorista({ ...editedMotorista, caminhaoAtual: value === "none" ? "" : value })}
+                  value={editedMotorista.caminhao_atual || "none"}
+                  onValueChange={(value) => setEditedMotorista({ ...editedMotorista, caminhao_atual: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um caminhão" />
@@ -863,6 +1041,29 @@ export default function Motoristas() {
               </Select>
             </div>
 
+            {/* Data de Admissão */}
+            <div className="space-y-2">
+              <Label htmlFor="data_admissao">Data de Admissão *</Label>
+              <Input
+                id="data_admissao"
+                type="date"
+                value={editedMotorista.data_admissao || ""}
+                onChange={(e) => {
+                  setEditedMotorista({ ...editedMotorista, data_admissao: e.target.value });
+                  setErrosCampos({ ...errosCampos, data_admissao: "" });
+                }}
+                className={errosCampos.data_admissao ? "border-red-500 focus-visible:ring-red-500" : ""}
+              />
+              {editedMotorista.data_admissao && (
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  ✓ Data: {formatarDataBrasileira(editedMotorista.data_admissao)}
+                </p>
+              )}
+              {errosCampos.data_admissao && (
+                <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.data_admissao}</p>
+              )}
+            </div>
+
             {/* Endereço */}
             <div className="space-y-2">
               <Label htmlFor="endereco">Endereço</Label>
@@ -886,9 +1087,9 @@ export default function Motoristas() {
               <div className="space-y-2">
                 <Label htmlFor="tipoPagamento">Método de Pagamento *</Label>
                 <Select
-                  value={editedMotorista.tipoPagamento || "pix"}
-                  onValueChange={(value: "pix" | "transferencia_bancaria") => 
-                    setEditedMotorista({ ...editedMotorista, tipoPagamento: value })
+                  value={editedMotorista.tipo_pagamento || "pix"}
+                  onValueChange={(value: "pix" | "transferencia_bancaria") =>
+                    setEditedMotorista({ ...editedMotorista, tipo_pagamento: value })
                   }
                 >
                   <SelectTrigger>
@@ -902,14 +1103,14 @@ export default function Motoristas() {
               </div>
 
               {/* PIX Fields */}
-              {editedMotorista.tipoPagamento === "pix" && (
+              {editedMotorista.tipo_pagamento === "pix" && (
                 <div className="space-y-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
                   <div className="space-y-2">
                     <Label htmlFor="chavePixTipo">Tipo de Chave PIX *</Label>
                     <Select
-                      value={editedMotorista.chavePixTipo || "cpf"}
-                      onValueChange={(value: "cpf" | "email" | "telefone" | "aleatoria") => 
-                        setEditedMotorista({ ...editedMotorista, chavePixTipo: value })
+                      value={editedMotorista.chave_pix_tipo || "cpf"}
+                      onValueChange={(value: "cpf" | "email" | "telefone" | "aleatoria") =>
+                        setEditedMotorista({ ...editedMotorista, chave_pix_tipo: value })
                       }
                     >
                       <SelectTrigger>
@@ -924,28 +1125,50 @@ export default function Motoristas() {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="chavePix">Chave PIX *</Label>
-                    <Input
-                      id="chavePix"
+                  {(editedMotorista.chave_pix_tipo === "cpf" || editedMotorista.chave_pix_tipo === "telefone") ? (
+                    <InputMascarado
+                      label="Chave PIX *"
+                      id="chave_pix"
+                      tipoMascara={(editedMotorista.chave_pix_tipo as string) === "cpf" ? "cpf" : "telefone"}
                       placeholder={
-                        editedMotorista.chavePixTipo === "cpf"
+                        editedMotorista.chave_pix_tipo === "cpf"
                           ? "000.000.000-00"
-                          : editedMotorista.chavePixTipo === "email"
-                          ? "email@example.com"
-                          : editedMotorista.chavePixTipo === "telefone"
-                          ? "(11) 98765-4321"
-                          : "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                          : "(11) 98765-4321"
                       }
-                      value={editedMotorista.chavePix || ""}
-                      onChange={(e) => setEditedMotorista({ ...editedMotorista, chavePix: e.target.value })}
+                      value={editedMotorista.chave_pix || ""}
+                      onChange={(e) => {
+                        setEditedMotorista({ ...editedMotorista, chave_pix: e.target.value });
+                        setErrosCampos({ ...errosCampos, chave_pix: "" });
+                      }}
+                      erro={errosCampos.chave_pix}
                     />
-                  </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor="chave_pix">Chave PIX *</Label>
+                      <Input
+                        id="chave_pix"
+                        placeholder={
+                          (editedMotorista.chave_pix_tipo as string) === "email"
+                            ? "email@example.com"
+                            : "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                        }
+                        value={editedMotorista.chave_pix || ""}
+                        onChange={(e) => {
+                          setEditedMotorista({ ...editedMotorista, chave_pix: e.target.value });
+                          setErrosCampos({ ...errosCampos, chave_pix: "" });
+                        }}
+                        className={errosCampos.chave_pix ? "border-red-500 focus-visible:ring-red-500" : ""}
+                      />
+                      {errosCampos.chave_pix && (
+                        <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.chave_pix}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Bank Transfer Fields */}
-              {editedMotorista.tipoPagamento === "transferencia_bancaria" && (
+              {(editedMotorista.tipo_pagamento as string) === "transferencia_bancaria" && (
                 <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-900">
                   <div className="space-y-2">
                     <Label htmlFor="banco">Banco *</Label>
@@ -953,8 +1176,15 @@ export default function Motoristas() {
                       id="banco"
                       placeholder="Banco do Brasil"
                       value={editedMotorista.banco || ""}
-                      onChange={(e) => setEditedMotorista({ ...editedMotorista, banco: e.target.value })}
+                      onChange={(e) => {
+                        setEditedMotorista({ ...editedMotorista, banco: e.target.value });
+                        setErrosCampos({ ...errosCampos, banco: "" });
+                      }}
+                      className={errosCampos.banco ? "border-red-500 focus-visible:ring-red-500" : ""}
                     />
+                    {errosCampos.banco && (
+                      <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.banco}</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -964,26 +1194,41 @@ export default function Motoristas() {
                         id="agencia"
                         placeholder="1234"
                         value={editedMotorista.agencia || ""}
-                        onChange={(e) => setEditedMotorista({ ...editedMotorista, agencia: e.target.value })}
+                        onChange={(e) => {
+                          setEditedMotorista({ ...editedMotorista, agencia: e.target.value });
+                          setErrosCampos({ ...errosCampos, agencia: "" });
+                        }}
+                        className={errosCampos.agencia ? "border-red-500 focus-visible:ring-red-500" : ""}
                       />
+                      {errosCampos.agencia && (
+                        <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.agencia}</p>
+                      )}
                     </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="conta">Conta *</Label>
                       <Input
                         id="conta"
                         placeholder="567890-1"
                         value={editedMotorista.conta || ""}
-                        onChange={(e) => setEditedMotorista({ ...editedMotorista, conta: e.target.value })}
+                        onChange={(e) => {
+                          setEditedMotorista({ ...editedMotorista, conta: e.target.value });
+                          setErrosCampos({ ...errosCampos, conta: "" });
+                        }}
+                        className={errosCampos.conta ? "border-red-500 focus-visible:ring-red-500" : ""}
                       />
+                      {errosCampos.conta && (
+                        <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.conta}</p>
+                      )}
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="tipoConta">Tipo de Conta *</Label>
                     <Select
-                      value={editedMotorista.tipoConta || "corrente"}
-                      onValueChange={(value: "corrente" | "poupanca") => 
-                        setEditedMotorista({ ...editedMotorista, tipoConta: value })
+                      value={editedMotorista.tipo_conta || "corrente"}
+                      onValueChange={(value: "corrente" | "poupanca") =>
+                        setEditedMotorista({ ...editedMotorista, tipo_conta: value })
                       }
                     >
                       <SelectTrigger>

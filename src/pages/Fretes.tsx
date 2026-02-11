@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -7,6 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import * as fretesService from "@/services/fretes";
+import * as motoristasService from "@/services/motoristas";
+import * as caminhoesService from "@/services/caminhoes";
+import fazendasService from "@/services/fazendas";
+import type { Frete as FreteAPI } from "@/types";
 import {
   Select,
   SelectContent,
@@ -62,6 +68,7 @@ interface Frete {
 
 interface EstoqueFazenda {
   id: string;
+  fazendaId?: string;
   fazenda: string;
   localizacao: string;
   mercadoria: string;
@@ -116,25 +123,6 @@ interface Custo {
   observacoes?: string;
   litros?: number;
   tipoCombustivel?: "gasolina" | "diesel" | "etanol" | "gnv";
-}
-
-interface NotaFiscal {
-  id: string;
-  freteId: string;
-  numeroNf: string;
-  serieNf: string;
-  dataEmissao: string;
-  dataSaida?: string;
-  dataEntrega?: string;
-  status: "emitida" | "cancelada" | "devolvida";
-  chaveAcesso?: string;
-  valorBruto: number;
-  icmsAliquota: number;
-  icmsValor: number;
-  valorLiquido: number;
-  arquivoPdf?: string;
-  arquivoXml?: string;
-  observacoes?: string;
 }
 
 const fretesData: Frete[] = [
@@ -288,6 +276,75 @@ const custosPorMotorista: CustoMotorista[] = [
   { motoristaId: "5", diaria: 155, adicionalPernoite: 82 }, // Lucas Ferreira
 ];
 
+// Dados demo de estoques de fazendas
+const estoquesFazendasData: EstoqueFazenda[] = [
+  {
+    id: "FAZ-001",
+    fazenda: "Fazenda Santa Clara",
+    localizacao: "Tupã - SP",
+    mercadoria: "Amendoim em Casca",
+    variedade: "Runner IAC 886",
+    quantidadeSacas: 15000,
+    quantidadeInicial: 20000,
+    precoPorTonelada: 3800,
+    pesoMedioSaca: 25,
+    safra: "2025/2026",
+    colheitaFinalizada: false,
+  },
+  {
+    id: "FAZ-002",
+    fazenda: "Fazenda Boa Vista",
+    localizacao: "Marília - SP",
+    mercadoria: "Amendoim Tipo 1",
+    variedade: "IAC OL3",
+    quantidadeSacas: 8500,
+    quantidadeInicial: 12000,
+    precoPorTonelada: 4000,
+    pesoMedioSaca: 25,
+    safra: "2025/2026",
+    colheitaFinalizada: false,
+  },
+  {
+    id: "FAZ-003",
+    fazenda: "Fazenda São José",
+    localizacao: "Osvaldo Cruz - SP",
+    mercadoria: "Amendoim Premium",
+    variedade: "IAC 503",
+    quantidadeSacas: 6200,
+    quantidadeInicial: 8000,
+    precoPorTonelada: 4500,
+    pesoMedioSaca: 25,
+    safra: "2025/2026",
+    colheitaFinalizada: false,
+  },
+  {
+    id: "FAZ-004",
+    fazenda: "Fazenda Nova Esperança",
+    localizacao: "Adamantina - SP",
+    mercadoria: "Amendoim Descascado",
+    variedade: "Runner IAC 886",
+    quantidadeSacas: 4800,
+    quantidadeInicial: 6000,
+    precoPorTonelada: 4200,
+    pesoMedioSaca: 25,
+    safra: "2025/2026",
+    colheitaFinalizada: false,
+  },
+  {
+    id: "FAZ-005",
+    fazenda: "Fazenda Primavera",
+    localizacao: "Dracena - SP",
+    mercadoria: "Amendoim Tipo 2",
+    variedade: "IAC OL4",
+    quantidadeSacas: 10500,
+    quantidadeInicial: 15000,
+    precoPorTonelada: 3600,
+    pesoMedioSaca: 25,
+    safra: "2025/2026",
+    colheitaFinalizada: false,
+  },
+];
+
 // Dados de custos adicionais
 const custosData: Custo[] = [
   {
@@ -374,96 +431,17 @@ const custosData: Custo[] = [
   },
 ];
 
-// Dados demo de notas fiscais
-const notasFiscaisData: NotaFiscal[] = [
-  {
-    id: "NF-2026-001",
-    freteId: "FRETE-2026-001",
-    numeroNf: "1001",
-    serieNf: "1",
-    dataEmissao: "20/01/2026",
-    dataSaida: "2026-01-20T06:30",
-    dataEntrega: "2026-01-20T14:45",
-    status: "emitida",
-    chaveAcesso: "35260193151816000160550010001001001234567890",
-    valorBruto: 7600,
-    icmsAliquota: 18,
-    icmsValor: 1368,
-    valorLiquido: 6232,
-    arquivoPdf: "/docs/nf/NF-2026-001.pdf",
-    observacoes: "Frete realizado conforme contrato. Carga verificada.",
-  },
-  {
-    id: "NF-2026-002",
-    freteId: "FRETE-2026-002",
-    numeroNf: "1002",
-    serieNf: "1",
-    dataEmissao: "18/01/2026",
-    dataSaida: "2026-01-18T07:00",
-    dataEntrega: "2026-01-18T15:20",
-    status: "emitida",
-    chaveAcesso: "35260193151816000160550010001002001234567891",
-    valorBruto: 7600,
-    icmsAliquota: 18,
-    icmsValor: 1368,
-    valorLiquido: 6232,
-    arquivoPdf: "/docs/nf/NF-2026-002.pdf",
-    observacoes: "Produto de qualidade premium. Entrega no horário.",
-  },
-  {
-    id: "NF-2026-003",
-    freteId: "FRETE-2026-003",
-    numeroNf: "1003",
-    serieNf: "1",
-    dataEmissao: "15/01/2026",
-    dataSaida: "2026-01-15T06:00",
-    dataEntrega: "2026-01-15T13:30",
-    status: "emitida",
-    chaveAcesso: "35260193151816000160550010001003001234567892",
-    valorBruto: 7500,
-    icmsAliquota: 18,
-    icmsValor: 1350,
-    valorLiquido: 6150,
-    arquivoPdf: "/docs/nf/NF-2026-003.pdf",
-    observacoes: "Rota executada sem incidentes.",
-  },
-  {
-    id: "NF-2026-004",
-    freteId: "FRETE-2026-004",
-    numeroNf: "1004",
-    serieNf: "1",
-    dataEmissao: "12/01/2026",
-    dataSaida: "2026-01-12T08:00",
-    dataEntrega: "2026-01-12T18:15",
-    status: "emitida",
-    chaveAcesso: "35260193151816000160550010001004001234567893",
-    valorBruto: 7500,
-    icmsAliquota: 18,
-    icmsValor: 1350,
-    valorLiquido: 6150,
-    arquivoPdf: "/docs/nf/NF-2026-004.pdf",
-    observacoes: "Produto com certificação especial.",
-  },
-  {
-    id: "NF-2026-005",
-    freteId: "FRETE-2026-005",
-    numeroNf: "1005",
-    serieNf: "1",
-    dataEmissao: "10/01/2026",
-    dataSaida: "2026-01-10T05:30",
-    dataEntrega: "2026-01-10T14:00",
-    status: "emitida",
-    chaveAcesso: "35260193151816000160550010001005001234567894",
-    valorBruto: 8400,
-    icmsAliquota: 18,
-    icmsValor: 1512,
-    valorLiquido: 6888,
-    arquivoPdf: "/docs/nf/NF-2026-005.pdf",
-    observacoes: "Frete de retorno com carga completa.",
-  },
-];
-
 export default function Fretes() {
+  const queryClient = useQueryClient();
+  
+  // Helper para converter valores para número
+  const toNumber = (value: number | string | null | undefined): number => {
+    if (typeof value === "number") return value;
+    if (value === null || value === undefined || value === "") return 0;
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+  
   const [search, setSearch] = useState("");
   const [motoristaFilter, setMotoristaFilter] = useState("all");
   const [caminhaoFilter, setCaminhaoFilter] = useState("all");
@@ -472,7 +450,6 @@ export default function Fretes() {
   const [selectedFrete, setSelectedFrete] = useState<Frete | null>(null);
   const [isNewFreteOpen, setIsNewFreteOpen] = useState(false);
   const [isEditingFrete, setIsEditingFrete] = useState(false);
-  const [fretesState, setFretesState] = useState<Frete[]>(fretesData);
   const [newFrete, setNewFrete] = useState({
     origem: "",
     destino: "",
@@ -486,7 +463,8 @@ export default function Fretes() {
   const [estoqueSelecionado, setEstoqueSelecionado] = useState<EstoqueFazenda | null>(null);
   
   // Estados para Exercício (Ano/Mês) e Fechamento
-  const [selectedPeriodo, setSelectedPeriodo] = useState("2026-01"); // Janeiro 2026
+  const [tipoVisualizacao, setTipoVisualizacao] = useState<"mensal" | "trimestral" | "semestral" | "anual">("mensal");
+  const [selectedPeriodo, setSelectedPeriodo] = useState(format(new Date(), "yyyy-MM")); // Mês atual
   const [mesesFechados, setMesesFechados] = useState<string[]>([]); // Meses que já foram fechados
   
   // Dados históricos para comparação (simulado - mes anterior)
@@ -497,12 +475,125 @@ export default function Fretes() {
     totalFretes: 12,
   };
 
-  const handleOpenNewModal = () => {
-    // Buscar fazendas de produção disponíveis
-    const getProducao = (window as any).getProducaoFazendas;
-    if (getProducao) {
-      const producao = getProducao() as EstoqueFazenda[];
-      setEstoquesFazendas(producao.filter((p) => !p.colheitaFinalizada));
+  // ========== QUERIES ==========
+  // Carregar Motoristas
+  const { data: motoristasData, isLoading: isLoadingMotoristas } = useQuery({
+    queryKey: ["motoristas"],
+    queryFn: async () => {
+      const res = await motoristasService.listarMotoristas();
+      if (res.success && Array.isArray(res.data)) {
+        return res.data;
+      }
+      throw new Error(res.message || "Erro ao carregar motoristas");
+    },
+  });
+
+  // Carregar Caminhões
+  const { data: caminhoesData, isLoading: isLoadingCaminhoes } = useQuery({
+    queryKey: ["caminhoes"],
+    queryFn: async () => {
+      const res = await caminhoesService.listarCaminhoes();
+      if (res.success && Array.isArray(res.data)) {
+        return res.data;
+      }
+      throw new Error(res.message || "Erro ao carregar caminhões");
+    },
+  });
+
+  // Carregar Fretes
+  const { data: fretesAPI, isLoading: isLoadingFretes } = useQuery({
+    queryKey: ["fretes"],
+    queryFn: async () => {
+      const res = await fretesService.listarFretes();
+      if (res.success && res.data) {
+        // Mapear dados da API para o formato interno
+        const fretesFormatados: Frete[] = res.data.map((freteAPI) => ({
+          id: freteAPI.id,
+          origem: freteAPI.origem,
+          destino: freteAPI.destino,
+          motorista: freteAPI.motorista_nome,
+          motoristaId: freteAPI.motorista_id,
+          caminhao: freteAPI.caminhao_placa,
+          caminhaoId: freteAPI.caminhao_id,
+          mercadoria: freteAPI.mercadoria,
+          mercadoriaId: freteAPI.mercadoria_id || freteAPI.mercadoria,
+          fazendaId: freteAPI.fazenda_id || undefined,
+          fazendaNome: freteAPI.fazenda_nome || undefined,
+          variedade: freteAPI.variedade || undefined,
+          dataFrete: freteAPI.data_frete,
+          quantidadeSacas: freteAPI.quantidade_sacas,
+          toneladas: freteAPI.toneladas,
+          valorPorTonelada: freteAPI.valor_por_tonelada,
+          receita: freteAPI.receita,
+          custos: freteAPI.custos,
+          resultado: freteAPI.resultado,
+        }));
+        return fretesFormatados;
+      }
+      throw new Error(res.message || "Erro ao carregar fretes");
+    },
+  });
+
+  const motoristasState = Array.isArray(motoristasData) ? motoristasData : [];
+  const caminhoesState = Array.isArray(caminhoesData) ? caminhoesData : [];
+  const fretesState = Array.isArray(fretesAPI) ? fretesAPI : [];
+
+  // Validar se período selecionado existe nos dados
+  useEffect(() => {
+    if (!Array.isArray(fretesState) || fretesState.length === 0) return;
+    
+    // Extrair períodos disponíveis
+    const periodos = fretesState.map((f) => {
+      const freteDate = parseDateBR(f.dataFrete);
+      const anoFrete = freteDate.getFullYear();
+      const mesFrete = freteDate.getMonth() + 1;
+      
+      if (tipoVisualizacao === "mensal") {
+        return `${anoFrete}-${String(mesFrete).padStart(2, "0")}`;
+      } else if (tipoVisualizacao === "trimestral") {
+        const trimestreFrete = Math.ceil(mesFrete / 3);
+        return `${anoFrete}-T${trimestreFrete}`;
+      } else if (tipoVisualizacao === "semestral") {
+        const semestreFrete = mesFrete <= 6 ? 1 : 2;
+        return `${anoFrete}-S${semestreFrete}`;
+      } else if (tipoVisualizacao === "anual") {
+        return String(anoFrete);
+      }
+      return "";
+    });
+    
+    const periodosUnicos = Array.from(new Set(periodos)).filter(Boolean).sort();
+    
+    // Se período atual não existe, usar o mais recente
+    if (!periodosUnicos.includes(selectedPeriodo) && periodosUnicos.length > 0) {
+      setSelectedPeriodo(periodosUnicos[periodosUnicos.length - 1]);
+    }
+  }, [fretesState, tipoVisualizacao, selectedPeriodo]);
+
+  const handleOpenNewModal = async () => {
+    // Carregar fazendas disponíveis da API
+    const res = await fazendasService.listarFazendas();
+    if (res.success && res.data) {
+      const fazendasFormatadas: EstoqueFazenda[] = res.data
+        .filter((f) => !f.colheita_finalizada)
+        .map((f) => ({
+          id: f.id,
+          fazendaId: f.fazenda_id || f.id, // Usa fazenda_id da API, ou fallback para id
+          fazenda: f.fazenda,
+          localizacao: f.localizacao || "",
+          mercadoria: f.mercadoria,
+          variedade: f.variedade || "",
+          quantidadeSacas: f.total_sacas_carregadas || 0,
+          quantidadeInicial: f.total_sacas_carregadas || 0,
+          precoPorTonelada: f.preco_por_tonelada || 0,
+          pesoMedioSaca: f.peso_medio_saca || 25,
+          safra: f.safra || "",
+          colheitaFinalizada: f.colheita_finalizada || false,
+        }));
+      setEstoquesFazendas(fazendasFormatadas);
+    } else {
+      toast.error("Erro ao carregar fazendas");
+      setEstoquesFazendas([]);
     }
     
     setNewFrete({
@@ -536,7 +627,7 @@ export default function Fretes() {
     }
   };
 
-  const handleSaveFrete = () => {
+  const handleSaveFrete = async () => {
     // Validar campos
     if (!newFrete.destino || !newFrete.motoristaId || 
         !newFrete.caminhaoId || !newFrete.fazendaId || !newFrete.toneladas || !newFrete.valorPorTonelada) {
@@ -565,68 +656,87 @@ export default function Fretes() {
     const quantidadeSacas = Math.round((toneladas * 1000) / estoqueSelecionado.pesoMedioSaca);
 
     // Buscar dados selecionados
-    const motorista = motoristasData.find(m => m.id === newFrete.motoristaId);
-    const caminhao = caminhoesData.find(c => c.id === newFrete.caminhaoId);
+    const motorista = motoristasState.find(m => m.id === newFrete.motoristaId);
+    const caminhao = caminhoesState.find(c => c.id === newFrete.caminhaoId);
     const custoAbastecimento = custosAbastecimentoPorCaminhao.find(c => c.id === newFrete.caminhaoId);
     const custoMotorista = custosPorMotorista.find(m => m.motoristaId === newFrete.motoristaId);
 
-    if (!motorista || !caminhao || !custoAbastecimento || !custoMotorista) return;
+    if (!motorista || !caminhao) {
+      toast.error("Erro ao buscar dados do motorista ou caminhão!");
+      return;
+    }
 
-    // Calcular receita
-    const receita = toneladas * valorPorTonelada;
+    // Calcular receita baseado no estoque (usar valores padrão se não encontrar custos específicos)
     const distanciaEstimada = 500;
     const combustivelNecess = distanciaEstimada / 5;
-    const custoCombustivel = combustivelNecess * custoAbastecimento.custoLitro;
-    const custoMotoristaTotal = custoMotorista.diaria;
-    const custos = Math.floor(custoCombustivel + custoMotoristaTotal);
-    const resultado = receita - custos;
+    const custoCombustivelLitro = custoAbastecimento?.custoLitro || 5.50; // valor padrão
+    const custoCombustivel = combustivelNecess * custoCombustivelLitro;
+    const custoMotoristaTotal = custoMotorista?.diaria || 150; // valor padrão
+    
+    // Usar 0 para custos - serão adicionados manualmente na tela de Custos
+    const custos = 0;
+    
+    // Valores apenas para exibição no modal (cálculo estimado)
+    const custoEstimado = Math.floor(custoCombustivel + custoMotoristaTotal);
 
     if (isEditingFrete) {
       toast.success("Frete atualizado com sucesso!");
-    } else {
-      // Adicionar produção à fazenda (incrementa sacas, toneladas e faturamento)
-      const adicionarProducao = (window as any).adicionarProducao;
-      if (adicionarProducao) {
-        adicionarProducao(estoqueSelecionado.id, quantidadeSacas, receita, toneladas);
-      }
+      setIsNewFreteOpen(false);
+      return;
+    }
 
-      // Buscar o ID da fazenda a partir dos dados do window
-      const getFazendas = (window as any).getFazendas;
-      let fazendaIdReal = newFrete.fazendaId;
-      if (getFazendas) {
-        const fazendas = getFazendas();
-        const fazendaEncontrada = fazendas.find((f: any) => 
-          f.nome.toLowerCase() === estoqueSelecionado.fazenda.toLowerCase()
+    // Preparar payload para API
+    const payload = {
+      origem: `${estoqueSelecionado.fazenda} - ${estoqueSelecionado.localizacao}`,
+      destino: newFrete.destino,
+      motorista_id: motorista.id,
+      motorista_nome: motorista.nome,
+      caminhao_id: caminhao.id,
+      caminhao_placa: caminhao.placa,
+      fazenda_id: newFrete.fazendaId,
+      fazenda_nome: estoqueSelecionado.fazenda,
+      mercadoria: estoqueSelecionado.mercadoria,
+      mercadoria_id: estoqueSelecionado.id,
+      variedade: estoqueSelecionado.variedade,
+      data_frete: format(new Date(), "yyyy-MM-dd"),
+      quantidade_sacas: quantidadeSacas,
+      toneladas: toneladas,
+      valor_por_tonelada: valorPorTonelada,
+      custos: custos,
+    };
+
+    // Criar frete via API
+    const res = await fretesService.criarFrete(payload);
+    
+    if (res.success) {
+      toast.success(`Frete cadastrado! ID: ${res.data?.id}`);
+      
+      // Incrementar volume transportado da fazenda
+      console.log("DEBUG: newFrete.fazendaId =", newFrete.fazendaId);
+      console.log("DEBUG: estoqueSelecionado =", estoqueSelecionado);
+      console.log("DEBUG: toneladas =", toneladas);
+      
+      if (newFrete.fazendaId) {
+        toast.info(`Atualizando volume da fazenda (ID: ${newFrete.fazendaId}) com ${toneladas}t...`);
+        const incrementRes = await fazendasService.incrementarVolumeTransportado(
+          newFrete.fazendaId,
+          toneladas
         );
-        if (fazendaEncontrada) {
-          fazendaIdReal = fazendaEncontrada.id;
+        console.log("DEBUG: incrementRes =", incrementRes);
+        if (incrementRes.success) {
+          toast.success("✅ Volume da fazenda atualizado!");
+        } else {
+          toast.warning("❌ Frete criado, mas não foi possível atualizar volume da fazenda: " + incrementRes.message);
         }
+      } else {
+        toast.warning("⚠️ Frete criado, mas ID da fazenda não foi encontrada para atualizar volume");
       }
-
-      const novoFrete: Frete = {
-        id: `#${Math.floor(Math.random() * 1000) + 1200}`,
-        origem: `${estoqueSelecionado.fazenda} - ${estoqueSelecionado.localizacao}`,
-        destino: newFrete.destino,
-        motorista: motorista.nome,
-        motoristaId: motorista.id,
-        caminhao: caminhao.placa,
-        caminhaoId: caminhao.id,
-        mercadoria: estoqueSelecionado.mercadoria,
-        mercadoriaId: estoqueSelecionado.id,
-        fazendaId: fazendaIdReal,
-        fazendaNome: estoqueSelecionado.fazenda,
-        variedade: estoqueSelecionado.variedade,
-        dataFrete: new Date().toLocaleDateString("pt-BR"),
-        quantidadeSacas: quantidadeSacas,
-        toneladas: toneladas,
-        valorPorTonelada: valorPorTonelada,
-        receita,
-        custos,
-        resultado,
-      };
-
-      setFretesState([novoFrete, ...fretesState]);
-      toast.success(`Frete cadastrado! Produção da fazenda atualizada: +${quantidadeSacas.toLocaleString("pt-BR")} sacas (+${toneladas.toFixed(2)}t)`);
+      
+      // Recarregar fretes e fazendas para refletir mudanças
+      queryClient.invalidateQueries({ queryKey: ["fretes"] });
+      queryClient.invalidateQueries({ queryKey: ["fazendas"] });
+    } else {
+      toast.error(res.message || "Erro ao cadastrar frete");
     }
 
     setIsNewFreteOpen(false);
@@ -643,8 +753,18 @@ export default function Fretes() {
   };
 
   const parseDateBR = (value: string) => {
-    const [dia, mes, ano] = value.split("/");
-    return new Date(Number(ano), Number(mes) - 1, Number(dia));
+    if (!value) return new Date();
+    
+    // Formato brasileiro: dd/MM/yyyy
+    if (value.includes("/")) {
+      const [dia, mes, ano] = value.split("/");
+      return new Date(Number(ano), Number(mes) - 1, Number(dia));
+    }
+    
+    // Formato ISO completo: 2026-02-10T03:00:00.000Z ou ISO simples: 2026-02-10
+    // O construtor new Date() já lida com ambos os formatos
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? new Date() : date;
   };
 
   const formatDateDisplay = (value: string) => {
@@ -688,9 +808,24 @@ export default function Fretes() {
     doc.setFont("helvetica", "bold");
     doc.text("RELATÓRIO DE FRETES", 105, 35, { align: "center" });
     
-    const [ano, mes] = selectedPeriodo.split("-");
-    const nomeMes = format(new Date(parseInt(ano), parseInt(mes) - 1), "MMMM yyyy", { locale: ptBR });
-    const nomeFormatado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    // Formatar nome do período baseado no tipo de visualização
+    let nomeFormatado = "";
+    if (tipoVisualizacao === "mensal") {
+      const [ano, mes] = selectedPeriodo.split("-");
+      const nomeMes = format(new Date(parseInt(ano), parseInt(mes) - 1), "MMMM yyyy", { locale: ptBR });
+      nomeFormatado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    } else if (tipoVisualizacao === "trimestral") {
+      // Formato: "2026-T1" -> "1º Trimestre 2026"
+      const [ano, trimestre] = selectedPeriodo.split("-T");
+      nomeFormatado = `${trimestre}º Trimestre ${ano}`;
+    } else if (tipoVisualizacao === "semestral") {
+      // Formato: "2026-S1" -> "1º Semestre 2026"
+      const [ano, semestre] = selectedPeriodo.split("-S");
+      nomeFormatado = `${semestre}º Semestre ${ano}`;
+    } else if (tipoVisualizacao === "anual") {
+      // Formato: "2026" -> "Ano 2026"
+      nomeFormatado = `Ano ${selectedPeriodo}`;
+    }
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
@@ -714,10 +849,10 @@ export default function Fretes() {
     yPosition += 12;
     
     // Cálculos
-    const totalReceita = filteredData.reduce((acc, f) => acc + f.receita, 0);
-    const totalCustos = filteredData.reduce((acc, f) => acc + f.custos, 0);
-    const totalLucro = filteredData.reduce((acc, f) => acc + f.resultado, 0);
-    const totalToneladas = filteredData.reduce((acc, f) => acc + f.toneladas, 0);
+    const totalReceita = filteredData.reduce((acc, f) => acc + toNumber(f.receita), 0);
+    const totalCustos = filteredData.reduce((acc, f) => acc + toNumber(f.custos), 0);
+    const totalLucro = filteredData.reduce((acc, f) => acc + toNumber(f.resultado), 0);
+    const totalToneladas = filteredData.reduce((acc, f) => acc + toNumber(f.toneladas), 0);
     const qtdFretes = filteredData.length;
     
     doc.setTextColor(0, 0, 0);
@@ -823,10 +958,10 @@ export default function Fretes() {
       f.id,
       `${f.origem} para ${f.destino}`,
       f.motorista,
-      `${f.toneladas}t`,
-      `R$ ${f.receita.toLocaleString("pt-BR")}`,
-      `R$ ${f.custos.toLocaleString("pt-BR")}`,
-      `R$ ${f.resultado.toLocaleString("pt-BR")}`,
+      `${toNumber(f.toneladas).toFixed(1)}t`,
+      `R$ ${toNumber(f.receita).toLocaleString("pt-BR")}`,
+      `R$ ${toNumber(f.custos).toLocaleString("pt-BR")}`,
+      `R$ ${toNumber(f.resultado).toLocaleString("pt-BR")}`,
     ]);
     
     autoTable(doc, {
@@ -888,12 +1023,33 @@ export default function Fretes() {
 
   // Filtrar fretes por período selecionado
   const fretesFiltradasPorPeriodo = useMemo(() => {
+    if (!Array.isArray(fretesState)) return [];
     return fretesState.filter((f) => {
-      const [dia, mes, ano] = f.dataFrete.split("/");
-      const periodoItem = `${ano}-${mes}`;
-      return periodoItem === selectedPeriodo;
+      const freteDate = parseDateBR(f.dataFrete);
+      const anoFrete = freteDate.getFullYear();
+      const mesFrete = freteDate.getMonth() + 1; // 1-12
+      
+      if (tipoVisualizacao === "mensal") {
+        // Formato: "2026-02"
+        const periodoItem = `${anoFrete}-${String(mesFrete).padStart(2, "0")}`;
+        return periodoItem === selectedPeriodo;
+      } else if (tipoVisualizacao === "trimestral") {
+        // Formato: "2026-T1" (T1, T2, T3, T4)
+        const trimestreFrete = Math.ceil(mesFrete / 3);
+        const periodoItem = `${anoFrete}-T${trimestreFrete}`;
+        return periodoItem === selectedPeriodo;
+      } else if (tipoVisualizacao === "semestral") {
+        // Formato: "2026-S1" (S1, S2)
+        const semestreFrete = mesFrete <= 6 ? 1 : 2;
+        const periodoItem = `${anoFrete}-S${semestreFrete}`;
+        return periodoItem === selectedPeriodo;
+      } else if (tipoVisualizacao === "anual") {
+        // Formato: "2026"
+        return String(anoFrete) === selectedPeriodo;
+      }
+      return false;
     });
-  }, [selectedPeriodo, fretesState]);
+  }, [selectedPeriodo, fretesState, tipoVisualizacao]);
 
   const filteredData = fretesFiltradasPorPeriodo.filter((frete) => {
     const matchesSearch =
@@ -921,6 +1077,52 @@ export default function Fretes() {
   const fazendasOptions = Array.from(
     new Set(fretesFiltradasPorPeriodo.map((f) => getFazendaNome(f)).filter(Boolean))
   ) as string[];
+
+  // Extrair períodos disponíveis baseado nos dados reais
+  const periodosDisponiveis = useMemo(() => {
+    if (!Array.isArray(fretesState)) return [];
+    
+    const periodos = fretesState.map((f) => {
+      const freteDate = parseDateBR(f.dataFrete);
+      const anoFrete = freteDate.getFullYear();
+      const mesFrete = freteDate.getMonth() + 1; // 1-12
+      
+      if (tipoVisualizacao === "mensal") {
+        return `${anoFrete}-${String(mesFrete).padStart(2, "0")}`;
+      } else if (tipoVisualizacao === "trimestral") {
+        const trimestreFrete = Math.ceil(mesFrete / 3);
+        return `${anoFrete}-T${trimestreFrete}`;
+      } else if (tipoVisualizacao === "semestral") {
+        const semestreFrete = mesFrete <= 6 ? 1 : 2;
+        return `${anoFrete}-S${semestreFrete}`;
+      } else if (tipoVisualizacao === "anual") {
+        return String(anoFrete);
+      }
+      return "";
+    });
+    
+    // Remover duplicatas e ordenar
+    const periodosUnicos = Array.from(new Set(periodos)).filter(Boolean).sort();
+    return periodosUnicos;
+  }, [fretesState, tipoVisualizacao]);
+
+  // Formatar label do período para exibição
+  const formatPeriodoLabel = (periodo: string) => {
+    if (tipoVisualizacao === "mensal") {
+      const [ano, mes] = periodo.split("-");
+      const nomeMes = format(new Date(parseInt(ano), parseInt(mes) - 1), "MMMM yyyy", { locale: ptBR });
+      return nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    } else if (tipoVisualizacao === "trimestral") {
+      const [ano, trimestre] = periodo.split("-T");
+      return `${trimestre}º Trimestre ${ano}`;
+    } else if (tipoVisualizacao === "semestral") {
+      const [ano, semestre] = periodo.split("-S");
+      return `${semestre}º Semestre ${ano}`;
+    } else if (tipoVisualizacao === "anual") {
+      return periodo;
+    }
+    return periodo;
+  };
 
   const clearFilters = () => {
     setSearch("");
@@ -999,15 +1201,15 @@ export default function Fretes() {
           <div className="space-y-1.5 text-xs">
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Package className="h-3 w-3 flex-shrink-0" />
-              <span className="font-semibold text-primary">{item.quantidadeSacas.toLocaleString("pt-BR")}</span>
+              <span className="font-semibold text-primary">{toNumber(item.quantidadeSacas).toLocaleString("pt-BR")}</span>
               <span>sacas</span>
               <span className="mx-0.5">•</span>
               <Weight className="h-3 w-3 flex-shrink-0" />
-              <span className="font-semibold text-primary">{item.toneladas.toFixed(2)}t</span>
+              <span className="font-semibold text-primary">{toNumber(item.toneladas).toFixed(2)}t</span>
             </div>
             <div className="flex items-center gap-1.5">
               <DollarSign className="h-3 w-3 text-profit flex-shrink-0" />
-              <span className="font-semibold text-profit">R$ {item.valorPorTonelada.toLocaleString("pt-BR")}/t</span>
+              <span className="font-semibold text-profit">R$ {toNumber(item.valorPorTonelada).toLocaleString("pt-BR")}/t</span>
             </div>
           </div>
         </div>
@@ -1021,12 +1223,12 @@ export default function Fretes() {
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-blue-600 flex-shrink-0" />
             <span className="text-xs font-semibold text-muted-foreground">Receita total:</span>
-            <span className="font-bold text-blue-600">R$ {item.receita.toLocaleString("pt-BR")}</span>
+            <span className="font-bold text-blue-600">R$ {toNumber(item.receita).toLocaleString("pt-BR")}</span>
           </div>
           <div className="flex items-center gap-2">
             <DollarSign className="h-4 w-4 text-red-600 flex-shrink-0" />
             <span className="text-xs font-semibold text-muted-foreground">Custos adicionais:</span>
-            <span className="font-bold text-red-600">R$ {item.custos.toLocaleString("pt-BR")}</span>
+            <span className="font-bold text-red-600">R$ {toNumber(item.custos).toLocaleString("pt-BR")}</span>
           </div>
           <p className="text-[10px] text-muted-foreground">
             Custos incluem pedágios, combustível, diárias, etc.
@@ -1038,23 +1240,23 @@ export default function Fretes() {
       key: "resultado",
       header: "Lucro líquido",
       render: (item: Frete) => {
-        const percentualLucro = item.receita > 0 ? ((item.resultado / item.receita) * 100).toFixed(0) : "0";
+        const percentualLucro = toNumber(item.receita) > 0 ? ((toNumber(item.resultado) / toNumber(item.receita)) * 100).toFixed(0) : "0";
         return (
           <div className="space-y-2">
             <Badge 
-              variant={item.resultado >= 0 ? "profit" : "loss"} 
+              variant={toNumber(item.resultado) >= 0 ? "profit" : "loss"} 
               className="w-fit font-bold text-lg px-3 py-1"
             >
-              {item.resultado >= 0 ? "+" : ""}R$ {item.resultado.toLocaleString("pt-BR")}
+              {toNumber(item.resultado) >= 0 ? "+" : ""}R$ {toNumber(item.resultado).toLocaleString("pt-BR")}
             </Badge>
             <div className="flex items-center gap-1.5">
               <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                 <div
-                  className={`h-full ${item.resultado >= 0 ? "bg-green-500" : "bg-red-500"}`}
+                  className={`h-full ${toNumber(item.resultado) >= 0 ? "bg-green-500" : "bg-red-500"}`}
                   style={{ width: `${Math.min(Math.abs(parseInt(percentualLucro)), 100)}%` }}
                 />
               </div>
-              <span className={`text-xs font-bold ${item.resultado >= 0 ? "text-green-600" : "text-red-600"}`}>
+              <span className={`text-xs font-bold ${toNumber(item.resultado) >= 0 ? "text-green-600" : "text-red-600"}`}>
                 {percentualLucro}%
               </span>
             </div>
@@ -1078,42 +1280,90 @@ export default function Fretes() {
         description="Receita é o valor total do frete. Custos são adicionais (pedágios, diárias, etc.)"
         actions={
           <div className="flex items-center gap-3">
-            {/* Seletor de Exercício (Ano/Mês) */}
+            {/* Seletor de Tipo de Visualização */}
             <div className="flex items-center gap-2">
-              <Label className="text-sm text-muted-foreground whitespace-nowrap">Exercício:</Label>
-              <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Selecione o mês" />
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">Visualizar:</Label>
+              <Select 
+                value={tipoVisualizacao} 
+                onValueChange={(value) => {
+                  const tipoAntigo = tipoVisualizacao;
+                  setTipoVisualizacao(value as any);
+                  
+                  // Aguardar próximo tick para que periodosDisponiveis seja recalculado
+                  setTimeout(() => {
+                    // Tentar usar período atual, senão usar o mais recente disponível
+                    const hoje = new Date();
+                    let periodoIdeal = "";
+                    
+                    if (value === "mensal") {
+                      periodoIdeal = format(hoje, "yyyy-MM");
+                    } else if (value === "trimestral") {
+                      const trimestre = Math.ceil((hoje.getMonth() + 1) / 3);
+                      periodoIdeal = `${hoje.getFullYear()}-T${trimestre}`;
+                    } else if (value === "semestral") {
+                      const semestre = hoje.getMonth() + 1 <= 6 ? 1 : 2;
+                      periodoIdeal = `${hoje.getFullYear()}-S${semestre}`;
+                    } else if (value === "anual") {
+                      periodoIdeal = String(hoje.getFullYear());
+                    }
+                    
+                    setSelectedPeriodo(periodoIdeal);
+                  }, 0);
+                }}
+              >
+                <SelectTrigger className="w-32">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="2025-11">Novembro 2025</SelectItem>
-                  <SelectItem value="2025-12">Dezembro 2025</SelectItem>
-                  <SelectItem value="2026-01">Janeiro 2026</SelectItem>
-                  <SelectItem value="2026-02">Fevereiro 2026</SelectItem>
-                  <SelectItem value="2026-03">Março 2026</SelectItem>
-                  <SelectItem value="2027-01">Janeiro 2027</SelectItem>
+                  <SelectItem value="mensal">Mensal</SelectItem>
+                  <SelectItem value="trimestral">Trimestral</SelectItem>
+                  <SelectItem value="semestral">Semestral</SelectItem>
+                  <SelectItem value="anual">Anual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Botão Fechar/Abrir Mês */}
-            <Button
-              variant={mesesFechados.includes(selectedPeriodo) ? "outline" : "secondary"}
-              onClick={handleToggleFecharMes}
-              className="gap-2"
-            >
-              {mesesFechados.includes(selectedPeriodo) ? (
-                <>
-                  <Unlock className="h-4 w-4" />
-                  Reabrir Mês
-                </>
-              ) : (
-                <>
-                  <Lock className="h-4 w-4" />
-                  Fechar Mês
-                </>
-              )}
-            </Button>
+            {/* Seletor de Período (dinâmico) */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">Período:</Label>
+              <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
+                <SelectTrigger className="w-44">
+                  <SelectValue placeholder="Selecione o período" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periodosDisponiveis.length === 0 ? (
+                    <SelectItem value="sem-dados" disabled>Nenhum dado disponível</SelectItem>
+                  ) : (
+                    periodosDisponiveis.map((periodo) => (
+                      <SelectItem key={periodo} value={periodo}>
+                        {formatPeriodoLabel(periodo)}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Botão Fechar/Abrir Mês (apenas para mensal) */}
+            {tipoVisualizacao === "mensal" && (
+              <Button
+                variant={mesesFechados.includes(selectedPeriodo) ? "outline" : "secondary"}
+                onClick={handleToggleFecharMes}
+                className="gap-2"
+              >
+                {mesesFechados.includes(selectedPeriodo) ? (
+                  <>
+                    <Unlock className="h-4 w-4" />
+                    Reabrir Mês
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4" />
+                    Fechar Mês
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* Botão Exportar PDF */}
             <Button variant="outline" onClick={handleExportarPDF} className="gap-2">
@@ -1124,7 +1374,7 @@ export default function Fretes() {
             {/* Botão Novo Frete */}
             <Button 
               onClick={handleOpenNewModal}
-              disabled={mesesFechados.includes(selectedPeriodo)}
+              disabled={tipoVisualizacao === "mensal" && mesesFechados.includes(selectedPeriodo)}
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Frete
@@ -1134,7 +1384,7 @@ export default function Fretes() {
       />
 
       {/* Badge de Status do Mês */}
-      {mesesFechados.includes(selectedPeriodo) && (
+      {tipoVisualizacao === "mensal" && mesesFechados.includes(selectedPeriodo) && (
         <div className="mb-4 flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
           <Lock className="h-4 w-4 text-blue-600" />
           <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">
@@ -1158,10 +1408,10 @@ export default function Fretes() {
             <Weight className="h-5 w-5 text-purple-600" />
           </div>
           <p className="text-3xl font-bold text-purple-600">
-            {filteredData.reduce((acc, f) => acc + f.toneladas, 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}t
+            {filteredData.reduce((acc, f) => acc + toNumber(f.toneladas), 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}t
           </p>
           <p className="text-sm font-medium text-purple-600/70 mt-1">
-            {filteredData.reduce((acc, f) => acc + f.quantidadeSacas, 0).toLocaleString("pt-BR")} sacas
+            {filteredData.reduce((acc, f) => acc + toNumber(f.quantidadeSacas), 0).toLocaleString("pt-BR")} sacas
           </p>
         </Card>
         <Card className="p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">
@@ -1170,7 +1420,7 @@ export default function Fretes() {
             <DollarSign className="h-5 w-5 text-blue-600" />
           </div>
           <p className="text-3xl font-bold text-blue-600">
-            R$ {filteredData.reduce((acc, f) => acc + f.receita, 0).toLocaleString("pt-BR")}
+            R$ {filteredData.reduce((acc, f) => acc + toNumber(f.receita), 0).toLocaleString("pt-BR")}
           </p>
         </Card>
         <Card className="p-4 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900">
@@ -1179,7 +1429,7 @@ export default function Fretes() {
             <AlertCircle className="h-5 w-5 text-red-600" />
           </div>
           <p className="text-3xl font-bold text-red-600">
-            R$ {filteredData.reduce((acc, f) => acc + f.custos, 0).toLocaleString("pt-BR")}
+            R$ {filteredData.reduce((acc, f) => acc + toNumber(f.custos), 0).toLocaleString("pt-BR")}
           </p>
         </Card>
         <Card className="p-4 bg-profit/5 border-profit/20">
@@ -1188,7 +1438,7 @@ export default function Fretes() {
             <TrendingUp className="h-5 w-5 text-profit" />
           </div>
           <p className="text-3xl font-bold text-profit">
-            R$ {filteredData.reduce((acc, f) => acc + f.resultado, 0).toLocaleString("pt-BR")}
+            R$ {filteredData.reduce((acc, f) => acc + toNumber(f.resultado), 0).toLocaleString("pt-BR")}
           </p>
         </Card>
       </div>
@@ -1206,7 +1456,7 @@ export default function Fretes() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {motoristasData.map((m) => (
+              {Array.isArray(motoristasState) && motoristasState.map((m) => (
                 <SelectItem key={m.id} value={m.id}>
                   {m.nome}
                 </SelectItem>
@@ -1222,7 +1472,7 @@ export default function Fretes() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {caminhoesData.map((c) => (
+              {Array.isArray(caminhoesState) && caminhoesState.map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   {c.placa}
                 </SelectItem>
@@ -1280,11 +1530,39 @@ export default function Fretes() {
         </Button>
       </FilterBar>
 
+      {/* Debug Info */}
+      {(isLoadingMotoristas || isLoadingCaminhoes || isLoadingFretes) && (
+        <div className="flex justify-center items-center py-12 text-muted-foreground">
+          Carregando dados...
+        </div>
+      )}
+      
+      {!isLoadingMotoristas && !isLoadingCaminhoes && !isLoadingFretes && (
+        <div className="mb-4 p-3 bg-muted rounded-lg text-xs space-y-1">
+          <div className="text-muted-foreground">
+            <strong>Debug:</strong> {motoristasState.length} motoristas • {caminhoesState.length} caminhões • {fretesState.length} fretes carregados
+          </div>
+          <div className="text-muted-foreground">
+            <strong>Período "{selectedPeriodo}":</strong> {fretesFiltradasPorPeriodo.length} fretes filtrados • {filteredData.length} após todos os filtros
+          </div>
+          {fretesState.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              <strong>Datas dos fretes:</strong> {fretesState.map(f => f.dataFrete).join(", ")}
+            </div>
+          )}
+          {motoristasState.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              <strong>Motoristas com caminhão fixo:</strong> {motoristasState.filter(m => m.caminhao_atual).map(m => `${m.nome} (${m.caminhao_atual})`).join(", ") || "Nenhum"}
+            </div>
+          )}
+        </div>
+      )}
+
       <DataTable<Frete>
         columns={columns}
         data={filteredData}
         onRowClick={(item) => setSelectedFrete(item)}
-        highlightNegative={(item) => item.resultado < 0}
+        highlightNegative={(item) => toNumber(item.resultado) < 0}
         emptyMessage="Nenhum frete encontrado"
       />
 
@@ -1351,7 +1629,7 @@ export default function Fretes() {
                     <p className="text-xs text-muted-foreground">Mercadoria</p>
                   </div>
                   <p className="font-semibold text-foreground">{selectedFrete.mercadoria}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{selectedFrete.quantidadeSacas} sacas • {selectedFrete.toneladas.toFixed(2)} ton • R$ {selectedFrete.valorPorTonelada.toLocaleString("pt-BR")}/t</p>
+                  <p className="text-xs text-muted-foreground mt-1">{toNumber(selectedFrete.quantidadeSacas)} sacas • {toNumber(selectedFrete.toneladas).toFixed(2)} ton • R$ {toNumber(selectedFrete.valorPorTonelada).toLocaleString("pt-BR")}/t</p>
                 </Card>
 
                 <Card className="p-4 bg-muted/50">
@@ -1375,7 +1653,7 @@ export default function Fretes() {
                       <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">RECEITA TOTAL</p>
                     </div>
                     <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                      R$ {selectedFrete.receita.toLocaleString("pt-BR")}
+                      R$ {toNumber(selectedFrete.receita).toLocaleString("pt-BR")}
                     </p>
                   </Card>
 
@@ -1385,21 +1663,21 @@ export default function Fretes() {
                       <p className="text-xs font-semibold text-red-700 dark:text-red-300">CUSTOS ADICIONAIS</p>
                     </div>
                     <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-                      R$ {selectedFrete.custos.toLocaleString("pt-BR")}
+                      R$ {toNumber(selectedFrete.custos).toLocaleString("pt-BR")}
                     </p>
                     <p className="text-[10px] text-red-600/80 mt-1">Pedágios, combustível, diárias, etc.</p>
                   </Card>
 
-                  <Card className={`p-4 ${selectedFrete.resultado >= 0 
+                  <Card className={`p-4 ${toNumber(selectedFrete.resultado) >= 0 
                     ? "bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900" 
                     : "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900"
                   }`}>
                     <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className={`h-4 w-4 ${selectedFrete.resultado >= 0 ? "text-green-600" : "text-red-600"}`} />
-                      <p className={`text-xs font-semibold ${selectedFrete.resultado >= 0 ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>LUCRO LÍQUIDO</p>
+                      <TrendingUp className={`h-4 w-4 ${toNumber(selectedFrete.resultado) >= 0 ? "text-green-600" : "text-red-600"}`} />
+                      <p className={`text-xs font-semibold ${toNumber(selectedFrete.resultado) >= 0 ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>LUCRO LÍQUIDO</p>
                     </div>
-                    <p className={`text-3xl font-bold ${selectedFrete.resultado >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                      {selectedFrete.resultado >= 0 ? "+" : ""}R$ {selectedFrete.resultado.toLocaleString("pt-BR")}
+                    <p className={`text-3xl font-bold ${toNumber(selectedFrete.resultado) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                      {toNumber(selectedFrete.resultado) >= 0 ? "+" : ""}R$ {toNumber(selectedFrete.resultado).toLocaleString("pt-BR")}
                     </p>
                   </Card>
                 </div>
@@ -1469,136 +1747,6 @@ export default function Fretes() {
                   );
                 })()}
               </div>
-
-              <Separator />
-
-              {/* Notas Fiscais */}
-              <div>
-                <h4 className="font-semibold mb-4">Documentação Fiscal</h4>
-                {(() => {
-                  const nfsDoFrete = notasFiscaisData.filter(nf => nf.freteId === selectedFrete.id);
-                  
-                  if (nfsDoFrete.length === 0) {
-                    return (
-                      <Card className="p-6 border-dashed border-2 bg-muted/30">
-                        <div className="flex flex-col items-center justify-center text-center">
-                          <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">Nenhuma nota fiscal registrada para este frete</p>
-                        </div>
-                      </Card>
-                    );
-                  }
-                  
-                  return (
-                    <div className="space-y-3">
-                      {nfsDoFrete.map((nf) => (
-                        <Card key={nf.id} className="p-4 hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
-                          <div className="space-y-3">
-                            {/* Header: NF Info */}
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-950 flex items-center justify-center">
-                                    <FileDown className="h-4 w-4 text-blue-600" />
-                                  </div>
-                                  <div>
-                                    <p className="font-bold text-lg">{nf.numeroNf}/{nf.serieNf}</p>
-                                    <p className="text-xs text-muted-foreground">{nf.dataEmissao}</p>
-                                  </div>
-                                </div>
-                              </div>
-                              <Badge className={`${
-                                nf.status === 'emitida' 
-                                  ? 'bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-300'
-                                  : nf.status === 'cancelada'
-                                  ? 'bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300'
-                                  : 'bg-yellow-100 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-300'
-                              }`}>
-                                {nf.status === 'emitida' ? '✓ Emitida' : nf.status === 'cancelada' ? '✗ Cancelada' : '⟲ Devolvida'}
-                              </Badge>
-                            </div>
-
-                            {/* Chave de Acesso */}
-                            {nf.chaveAcesso && (
-                              <div className="bg-slate-50 dark:bg-slate-900/40 p-3 rounded-lg">
-                                <p className="text-xs text-muted-foreground mb-1">Chave de Acesso</p>
-                                <p className="font-mono text-xs break-all text-foreground">{nf.chaveAcesso}</p>
-                              </div>
-                            )}
-
-                            {/* Datas de Saída e Entrega */}
-                            {(nf.dataSaida || nf.dataEntrega) && (
-                              <div className="grid grid-cols-2 gap-2 text-sm">
-                                {nf.dataSaida && (
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Saída</p>
-                                    <p className="font-semibold">{new Date(nf.dataSaida).toLocaleString('pt-BR')}</p>
-                                  </div>
-                                )}
-                                {nf.dataEntrega && (
-                                  <div>
-                                    <p className="text-xs text-muted-foreground">Entrega</p>
-                                    <p className="font-semibold">{new Date(nf.dataEntrega).toLocaleString('pt-BR')}</p>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Valores */}
-                            <div className="grid grid-cols-3 gap-2 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/40 dark:to-slate-800/40 p-3 rounded-lg">
-                              <div>
-                                <p className="text-xs text-muted-foreground">Valor Bruto</p>
-                                <p className="font-bold text-blue-600 dark:text-blue-400">R$ {nf.valorBruto.toLocaleString('pt-BR')}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-muted-foreground">ICMS ({nf.icmsAliquota}%)</p>
-                                <p className="font-bold text-red-600 dark:text-red-400">-R$ {nf.icmsValor.toLocaleString('pt-BR')}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-muted-foreground">Valor Líquido</p>
-                                <p className="font-bold text-green-600 dark:text-green-400">R$ {nf.valorLiquido.toLocaleString('pt-BR')}</p>
-                              </div>
-                            </div>
-
-                            {/* Arquivos */}
-                            <div className="flex gap-2">
-                              {nf.arquivoPdf && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="flex-1 gap-2"
-                                  onClick={() => window.open(nf.arquivoPdf, '_blank')}
-                                >
-                                  <FileDown className="h-4 w-4" />
-                                  PDF
-                                </Button>
-                              )}
-                              {nf.chaveAcesso && (
-                                <Button 
-                                  variant="outline" 
-                                  size="sm" 
-                                  className="flex-1 gap-2"
-                                  onClick={() => toast.info('Recurso de consulta SEFAZ em implementação')}
-                                >
-                                  🔍 Consultar
-                                </Button>
-                              )}
-                            </div>
-
-                            {/* Observações */}
-                            {nf.observacoes && (
-                              <div className="text-xs text-muted-foreground border-t pt-2">
-                                <p className="font-semibold mb-1">Observações:</p>
-                                <p>{nf.observacoes}</p>
-                              </div>
-                            )}
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
             </>
           )}
           </div>
@@ -1637,7 +1785,7 @@ export default function Fretes() {
                       setEstoqueSelecionado(estoque || null);
                       setNewFrete({ 
                         ...newFrete, 
-                        fazendaId: v,
+                        fazendaId: estoque?.fazendaId || v,
                         valorPorTonelada: estoque ? estoque.precoPorTonelada.toString() : ""
                       });
                     }}
@@ -1646,7 +1794,7 @@ export default function Fretes() {
                       <SelectValue placeholder="Selecione a fazenda produtora" />
                     </SelectTrigger>
                     <SelectContent>
-                      {estoquesFazendas.length === 0 ? (
+                      {!Array.isArray(estoquesFazendas) || estoquesFazendas.length === 0 ? (
                         <SelectItem value="none" disabled>Nenhuma fazenda cadastrada</SelectItem>
                       ) : (
                         estoquesFazendas.map((e) => (
@@ -1751,17 +1899,40 @@ export default function Fretes() {
                   </Label>
                   <Select 
                     value={newFrete.motoristaId} 
-                    onValueChange={(v) => setNewFrete({ ...newFrete, motoristaId: v })}
+                    onValueChange={(v) => {
+                      // Buscar caminhão que tem esse motorista como fixo
+                      const caminhaoDoMotorista = caminhoesState.find(c => c.motorista_fixo_id === v);
+                      
+                      // Se encontrou caminhão fixo, preencher automaticamente
+                      if (caminhaoDoMotorista) {
+                        setNewFrete({ 
+                          ...newFrete, 
+                          motoristaId: v,
+                          caminhaoId: caminhaoDoMotorista.id 
+                        });
+                        toast.info(`Caminhão ${caminhaoDoMotorista.placa} preenchido automaticamente`);
+                      } else {
+                        setNewFrete({ ...newFrete, motoristaId: v, caminhaoId: "" });
+                      }
+                    }}
                   >
                     <SelectTrigger id="motorista">
                       <SelectValue placeholder="Selecione um motorista" />
                     </SelectTrigger>
                     <SelectContent>
-                      {motoristasData.map((m) => (
-                        <SelectItem key={m.id} value={m.id}>
-                          {m.nome}
-                        </SelectItem>
-                      ))}
+                      {Array.isArray(motoristasState) && motoristasState.map((m) => {
+                        const caminhaoFixo = caminhoesState.find(c => c.motorista_fixo_id === m.id);
+                        return (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.nome}
+                            {caminhaoFixo && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({caminhaoFixo.placa})
+                              </span>
+                            )}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1770,21 +1941,40 @@ export default function Fretes() {
                     <Truck className="h-4 w-4 text-primary" />
                     Caminhão *
                   </Label>
-                  <Select 
-                    value={newFrete.caminhaoId} 
-                    onValueChange={(v) => setNewFrete({ ...newFrete, caminhaoId: v })}
-                  >
-                    <SelectTrigger id="caminhao">
-                      <SelectValue placeholder="Selecione um caminhão" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {caminhoesData.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.placa}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {(() => {
+                    // Busca o caminhão que tem este motorista como fixo
+                    const caminhaoFixo = caminhoesState.find(c => c.motorista_fixo_id === newFrete.motoristaId);
+                    
+                    if (caminhaoFixo) {
+                      return (
+                        <div className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Truck className="h-4 w-4 text-primary" />
+                            <span className="font-medium">{caminhaoFixo.placa}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">Fixo</span>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <Select 
+                        value={newFrete.caminhaoId} 
+                        onValueChange={(v) => setNewFrete({ ...newFrete, caminhaoId: v })}
+                      >
+                        <SelectTrigger id="caminhao">
+                          <SelectValue placeholder="Selecione um caminhão" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.isArray(caminhoesState) && caminhoesState.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.placa}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -1803,16 +1993,22 @@ export default function Fretes() {
                     <Weight className="h-4 w-4 text-blue-600" />
                     Toneladas *
                   </Label>
-                  <Input
-                    id="toneladas"
-                    type="number"
-                    placeholder="Ex: 10.5"
-                    step="0.1"
-                    min="0.1"
-                    value={newFrete.toneladas}
-                    onChange={(e) => setNewFrete({ ...newFrete, toneladas: e.target.value })}
-                    disabled={!estoqueSelecionado}
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                      t
+                    </span>
+                    <Input
+                      id="toneladas"
+                      type="number"
+                      placeholder="Ex: 10.5"
+                      step="0.1"
+                      min="0.1"
+                      className="pl-8"
+                      value={newFrete.toneladas}
+                      onChange={(e) => setNewFrete({ ...newFrete, toneladas: e.target.value })}
+                      disabled={!estoqueSelecionado}
+                    />
+                  </div>
                   {estoqueSelecionado && newFrete.toneladas && (
                     <p className="text-xs text-blue-600">
                       ≈ {Math.round((parseFloat(newFrete.toneladas) * 1000) / estoqueSelecionado.pesoMedioSaca).toLocaleString("pt-BR")} sacas ({estoqueSelecionado.pesoMedioSaca}kg cada)
@@ -1875,38 +2071,6 @@ export default function Fretes() {
                   </Card>
                 )}
               </div>
-
-              {/* Seção: Documentação Fiscal */}
-              {!isEditingFrete && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <div className="h-1 w-1 rounded-full bg-blue-600" />
-                    <h3 className="font-semibold text-blue-600">Nota Fiscal (Opcional)</h3>
-                  </div>
-                  <Card className="p-4 border-l-4 border-l-blue-500 bg-blue-50 dark:bg-blue-950/20">
-                    <div className="space-y-3">
-                      <div>
-                        <Label className="text-sm font-semibold">Número da Nota Fiscal</Label>
-                        <Input 
-                          placeholder="Ex: 1001"
-                          className="mt-1"
-                          disabled
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">Será gerado automaticamente após criação do frete</p>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        <p className="font-semibold text-foreground mb-1">ℹ️ Informações:</p>
-                        <ul className="list-disc list-inside space-y-1 text-xs">
-                          <li>A nota fiscal será criada automaticamente ao salvar o frete</li>
-                          <li>Valor bruto: R$ (toneladas × valor por tonelada)</li>
-                          <li>ICMS: 18% (alíquota padrão)</li>
-                          <li>Você pode gerenciar a documentação fiscal nos detalhes do frete</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </Card>
-                </div>
-              )}
             </div>
           </div>
 

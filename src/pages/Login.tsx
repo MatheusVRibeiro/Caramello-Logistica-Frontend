@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { AuthLayout } from "@/auth/AuthLayout";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertCircle, Mail, Lock } from "lucide-react";
+import { Loader2, AlertCircle, Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -15,12 +15,21 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = location.state?.from?.pathname || "/";
+
+  useEffect(() => {
+    const savedEmail = localStorage.getItem("@RNLogistica:savedEmail");
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,10 +41,15 @@ export default function Login() {
     }
 
     setIsSubmitting(true);
-
+    
     const success = await login(email, password);
 
     if (success) {
+      if (rememberMe) {
+        localStorage.setItem("@RNLogistica:savedEmail", email);
+      } else {
+        localStorage.removeItem("@RNLogistica:savedEmail");
+      }
       navigate(from, { replace: true });
     } else {
       setError("Usuário ou senha inválidos");
@@ -45,57 +59,90 @@ export default function Login() {
 
   return (
     <AuthLayout>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2 text-center">
-          <h2 className="text-xl font-semibold text-foreground">Bem-vindo de volta</h2>
-          <p className="text-sm text-muted-foreground">
+      <form onSubmit={handleSubmit} className="space-y-8">
+        {/* Centered Header */}
+        <div className="space-y-3 text-center">
+          <div className="inline-block">
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              Bem-vindo
+            </h2>
+          </div>
+          <p className="text-base sm:text-lg text-muted-foreground font-medium">
             Entre com suas credenciais para acessar o sistema
           </p>
+          <div className="h-1 w-12 bg-gradient-to-r from-primary to-primary/40 mx-auto rounded-full" />
         </div>
 
+        {/* Error Alert */}
         {error && (
-          <Alert variant="destructive" className="animate-fade-in">
+          <Alert variant="destructive" className="animate-in slide-in-from-top-2 duration-300">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
-        <div className="space-y-4">
+        {/* Form Fields */}
+        <div className="space-y-5">
+          {/* Email Field */}
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Label htmlFor="email" className="text-sm font-semibold">
+              Email
+            </Label>
+            <div className="relative group">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary" />
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="seu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
+                className="pl-12 h-12 text-base rounded-lg border-2 transition-all focus:border-primary focus:ring-0"
                 disabled={isSubmitting}
-                autoComplete="email"
+                autoComplete="username"
+                required
               />
             </div>
           </div>
 
+          {/* Password Field */}
           <div className="space-y-2">
-            <Label htmlFor="password">Senha</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Label htmlFor="password" className="text-sm font-semibold">
+              Senha
+            </Label>
+            <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground transition-colors group-focus-within:text-primary" />
               <Input
                 id="password"
-                type="password"
+                name="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10"
+                className="pl-12 pr-12 h-12 text-base rounded-lg border-2 transition-all focus:border-primary focus:ring-0"
                 disabled={isSubmitting}
                 autoComplete="current-password"
+                required
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-all hover:scale-110 active:scale-95"
+                disabled={isSubmitting}
+                tabIndex={-1}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-5 w-5" />
+                ) : (
+                  <Eye className="h-5 w-5" />
+                )}
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          {/* Remember Me & Forgot Password */}
+          <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-2">
               <Checkbox
                 id="remember"
@@ -103,44 +150,45 @@ export default function Login() {
                 onCheckedChange={(checked) => setRememberMe(checked === true)}
                 disabled={isSubmitting}
               />
-              <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
+              <Label
+                htmlFor="remember"
+                className="text-sm font-normal cursor-pointer select-none"
+              >
                 Lembrar-me
               </Label>
             </div>
             <button
               type="button"
-              className="text-sm text-primary hover:underline"
+              className="text-sm text-primary hover:underline font-medium transition-colors"
               onClick={() => {}}
+              disabled={isSubmitting}
             >
               Esqueci minha senha
             </button>
           </div>
         </div>
 
+        {/* Submit Button */}
         <Button
           type="submit"
-          className="w-full"
+          className="w-full h-12 text-base font-semibold transition-all hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] rounded-lg"
           size="lg"
           disabled={isSubmitting}
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Entrando...
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Autenticando...
             </>
           ) : (
-            "Entrar"
+            "Acessar Sistema"
           )}
         </Button>
 
-        {/* Demo credentials hint */}
-        <div className="pt-4 border-t">
-          <p className="text-xs text-muted-foreground text-center mb-2">
-            Credenciais de demonstração:
-          </p>
-          <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3 space-y-1">
-            <p><strong>Admin:</strong> admin@rnlogistica.com / admin123</p>
-            <p><strong>Operador:</strong> operador@rnlogistica.com / operador123</p>
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border/50" />
           </div>
         </div>
       </form>
