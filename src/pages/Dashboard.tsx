@@ -207,6 +207,17 @@ export default function Dashboard() {
       return diff < 7 * 24 * 60 * 60 * 1000;
     }).length;
     
+    // Fretes de hoje
+    const fretesHoje = fretesParaCalcular.filter((f: FreteSimulado) => {
+      if (!f.data_frete) return false;
+      const dataFrete = new Date(f.data_frete);
+      return dataFrete.toDateString() === hoje.toDateString();
+    });
+    
+    const totalFretesHoje = fretesHoje.length;
+    const totalSacasHoje = fretesHoje.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.quantidadeSacas) || 0), 0);
+    const totalToneladasHoje = totalSacasHoje * 25 / 1000; // Conversão de sacas para toneladas (25kg por saca)
+    
     // KPIs de Fretes (Janeiro / Atual)
     const totalSacasJan = fretesJaneiro.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.quantidadeSacas) || 0), 0);
     const totalReceitaJan = fretesJaneiro.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.receita) || 0), 0);
@@ -273,6 +284,11 @@ export default function Dashboard() {
     const trendEstoque = 0; // Sem dados iniciais para calcular trend
     
     return {
+      hoje: {
+        totalFretes: totalFretesHoje,
+        totalSacas: totalSacasHoje,
+        totalToneladas: totalToneladasHoje,
+      },
       janeiro: {
         fretesAtivos,
         totalSacas: totalSacasJan,
@@ -511,15 +527,15 @@ export default function Dashboard() {
       {/* ===== SEÇÃO 2: KPI CARDS DE FRETES (MANTIDOS) ===== */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <KPICard
-          title="Sacas Transportadas"
-          value={`${Number(kpisIntegrados.janeiro.totalSacas || 0).toLocaleString("pt-BR")} sacas`}
+          title="Fretes Realizados Hoje"
+          value={`${kpisIntegrados.hoje.totalFretes} ${kpisIntegrados.hoje.totalFretes === 1 ? 'frete' : 'fretes'}`}
           icon={Package}
           variant="primary"
           trend={{
-            value: Math.abs(Number(kpisIntegrados.trends.sacas || 0)),
-            isPositive: (Number(kpisIntegrados.trends.sacas || 0)) >= 0,
+            value: 0,
+            isPositive: true,
           }}
-          tooltip={`Total de sacas transportadas em Janeiro. Equivale a ~${((Number(kpisIntegrados.janeiro.totalSacas || 0)) * 25 / 1000).toFixed(1)} toneladas. Clique para ver detalhes`}
+          tooltip={`${kpisIntegrados.hoje.totalSacas.toLocaleString("pt-BR")} sacas (${kpisIntegrados.hoje.totalToneladas.toFixed(1)} toneladas) transportadas hoje`}
           onClick={() => setModalAberto("sacas")}
         />
         <KPICard

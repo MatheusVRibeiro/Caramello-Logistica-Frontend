@@ -4,7 +4,6 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable } from "@/components/shared/DataTable";
-import { QuickGlanceDashboard, createFretesQuickGlanceCards } from "@/components/shared/QuickGlanceDashboard";
 import { SkeletonTable } from "@/components/shared/Skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1450,32 +1449,6 @@ export default function Fretes() {
           </p>
         </div>
       )}
-
-      {/* Dashboard de Batida de Olho - Quick Glance */}
-      <QuickGlanceDashboard
-        isLoading={isLoadingFretes}
-        cards={createFretesQuickGlanceCards({
-          fretesToday: fretesState.filter(f => {
-            const freteDate = parseDateBR(f.dataFrete);
-            const hoje = new Date();
-            return freteDate.toDateString() === hoje.toDateString();
-          }).length,
-          fretesTodaySacas: fretesState
-            .filter(f => {
-              const freteDate = parseDateBR(f.dataFrete);
-              const hoje = new Date();
-              return freteDate.toDateString() === hoje.toDateString();
-            })
-            .reduce((acc, f) => acc + f.quantidadeSacas, 0),
-          pendingPayments: fretesState.filter(f => f.resultado > 0).length,
-          pendingPaymentsValue: fretesState
-            .filter(f => f.resultado > 0)
-            .reduce((acc, f) => acc + toNumber(f.resultado), 0),
-          tasksOverdue: 0, // Placeholder
-          fleetUtilization: Math.round((caminhoesState.filter(c => c.status === "em_viagem").length / caminhoesState.length) * 100) || 0,
-          isLoading: isLoadingFretes,
-        })}
-      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-6">
