@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -12,6 +12,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format, parse } from "date-fns";
@@ -433,6 +442,8 @@ export default function Pagamentos() {
   const [dataPagamentoSelected, setDataPagamentoSelected] = useState<Date | undefined>();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFretes, setSelectedFretes] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   const motoristas = useMemo(
     () =>
@@ -707,6 +718,16 @@ export default function Pagamentos() {
       motoristaFilter === "all" || pagamento.motoristaId === motoristaFilter;
     return matchesSearch && matchesStatus && matchesMotorista;
   });
+
+  // Lógica de paginação
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
+  // Resetar para página 1 quando aplicar novos filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, motoristaFilter]);
 
   // Função para exportar PDF profissional e completo
   const handleExportarPDF = () => {
@@ -1374,10 +1395,84 @@ export default function Pagamentos() {
 
       <DataTable<PagamentoMotorista>
         columns={columns}
-        data={filteredData}
+        data={paginatedData}
         onRowClick={(item) => setSelectedPagamento(item)}
         emptyMessage="Nenhum pagamento encontrado"
       />
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(Math.max(1, currentPage - 1));
+                  }}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                const isCurrentPage = page === currentPage;
+                const isVisible = Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages;
+
+                if (!isVisible) {
+                  return null;
+                }
+
+                if (page === 2 && currentPage > 3) {
+                  return (
+                    <PaginationItem key="ellipsis-start">
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  );
+                }
+
+                if (page === totalPages - 1 && currentPage < totalPages - 2) {
+                  return (
+                    <PaginationItem key="ellipsis-end">
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  );
+                }
+
+                return (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(page);
+                      }}
+                      isActive={isCurrentPage}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(Math.min(totalPages, currentPage + 1));
+                  }}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+          <div className="text-xs text-muted-foreground ml-4 flex items-center">
+            Página {currentPage} de {totalPages} • {filteredData.length} registros
+          </div>
+        </div>
+      )}
 
       {/* Payment Detail Modal */}
       <Dialog open={!!selectedPagamento} onOpenChange={() => setSelectedPagamento(null)}>

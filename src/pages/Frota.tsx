@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -8,6 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 import {
   Select,
   SelectContent,
@@ -46,6 +55,8 @@ export default function Frota() {
   const [isEditing, setIsEditing] = useState(false);
   const [selectedCaminhao, setSelectedCaminhao] = useState<Caminhao | null>(null);
   const [editedCaminhao, setEditedCaminhao] = useState<Partial<CriarCaminhaoPayload>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // Query para buscar caminhões
   const { data: caminhoesResponse, isLoading } = useQuery({
@@ -169,6 +180,16 @@ export default function Frota() {
       statusFilter === "all" || caminhao.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Lógica de paginação
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
+  // Resetar para página 1 quando aplicar novos filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter]);
 
   const getMaintenanceStatus = (km: number, proxima: number) => {
     const percentual = (km / proxima) * 100;
@@ -569,12 +590,88 @@ export default function Frota() {
           </div>
         </div>
       ) : (
-        <DataTable<Caminhao>
-          columns={columns}
-          data={filteredData}
-          emptyMessage="Nenhum caminhão encontrado"
-          onRowClick={(caminhao) => setSelectedCaminhao(caminhao)}
-        />
+        <>
+          <DataTable<Caminhao>
+            columns={columns}
+            data={paginatedData}
+            emptyMessage="Nenhum caminhão encontrado"
+            onRowClick={(caminhao) => setSelectedCaminhao(caminhao)}
+          />
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+          <div className="mt-6 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(Math.max(1, currentPage - 1));
+                    }}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  const isCurrentPage = page === currentPage;
+                  const isVisible = Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages;
+
+                  if (!isVisible) {
+                    return null;
+                  }
+
+                  if (page === 2 && currentPage > 3) {
+                    return (
+                      <PaginationItem key="ellipsis-start">
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+
+                  if (page === totalPages - 1 && currentPage < totalPages - 2) {
+                    return (
+                      <PaginationItem key="ellipsis-end">
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(page);
+                        }}
+                        isActive={isCurrentPage}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(Math.min(totalPages, currentPage + 1));
+                    }}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-xs text-muted-foreground ml-4 flex items-center">
+              Página {currentPage} de {totalPages} • {filteredData.length} registros
+            </div>
+          </div>
+        )}
+        </>
       )}
 
       {/* Details Modal */}

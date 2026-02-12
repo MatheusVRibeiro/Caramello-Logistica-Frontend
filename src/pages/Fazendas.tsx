@@ -19,6 +19,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -204,6 +213,9 @@ export default function Fazendas() {
     }
   };
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
   const filteredData = fazendas.filter(
     (p) =>
       p.fazenda.toLowerCase().includes(search.toLowerCase()) ||
@@ -212,8 +224,18 @@ export default function Fazendas() {
       (p.proprietario?.toLowerCase() || "").includes(search.toLowerCase())
   );
 
-  const fazendasAtivas = filteredData.filter((p) => !p.colheita_finalizada);
-  const fazendasFinalizadas = filteredData.filter((p) => p.colheita_finalizada);
+  // Lógica de paginação
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
+  // Resetar para página 1 quando aplicar novos filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  const fazendasAtivas = paginatedData.filter((p) => !p.colheita_finalizada);
+  const fazendasFinalizadas = paginatedData.filter((p) => p.colheita_finalizada);
 
   // Função para adicionar produção quando um frete é carregado
   useEffect(() => {
@@ -832,6 +854,80 @@ export default function Fazendas() {
             </div>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(Math.max(1, currentPage - 1));
+                    }}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  const isCurrentPage = page === currentPage;
+                  const isVisible = Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages;
+
+                  if (!isVisible) {
+                    return null;
+                  }
+
+                  if (page === 2 && currentPage > 3) {
+                    return (
+                      <PaginationItem key="ellipsis-start">
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+
+                  if (page === totalPages - 1 && currentPage < totalPages - 2) {
+                    return (
+                      <PaginationItem key="ellipsis-end">
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(page);
+                        }}
+                        isActive={isCurrentPage}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(Math.min(totalPages, currentPage + 1));
+                    }}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-xs text-muted-foreground ml-4 flex items-center">
+              Página {currentPage} de {totalPages} • {filteredData.length} registros
+            </div>
+          </div>
+        )}
 
         {/* Empty State */}
         {filteredData.length === 0 && (

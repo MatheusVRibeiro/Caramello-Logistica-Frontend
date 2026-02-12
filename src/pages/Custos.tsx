@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -14,6 +14,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 import custosService from "@/services/custos";
 import * as fretesService from "@/services/fretes";
 import { usePeriodoFilter } from "@/hooks/usePeriodoFilter";
@@ -148,6 +157,8 @@ export default function Custos() {
   const [editingCusto, setEditingCusto] = useState<Custo | null>(null);
   const [selectedCusto, setSelectedCusto] = useState<Custo | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // Estados do formulário
   const [formData, setFormData] = useState<Partial<CriarCustoPayload>>({
@@ -320,6 +331,16 @@ export default function Custos() {
     
     return matchesSearch && matchesTipo && matchesMotorista && matchesComprovante && matchesDate;
   });
+
+  // Lógica de paginação
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
+  // Resetar para página 1 quando aplicar novos filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, tipoFilter, motoristaFilter, comprovanteFilter, dateFrom, dateTo]);
 
   const totalCustos = custosFiltrados.reduce((acc, c) => acc + toNumber(c.valor), 0);
   const totalCombustivel = custosFiltrados
@@ -636,7 +657,7 @@ export default function Custos() {
             </div>
             <DataTable<Custo>
               columns={columns}
-              data={filteredData.filter(c => c.tipo === "combustivel")}
+              data={paginatedData.filter(c => c.tipo === "combustivel")}
               onRowClick={handleRowClick}
               emptyMessage="Nenhum custo de combustível"
             />
@@ -672,7 +693,7 @@ export default function Custos() {
             </div>
             <DataTable<Custo>
               columns={columns}
-              data={filteredData.filter(c => c.tipo === "pedagio")}
+              data={paginatedData.filter(c => c.tipo === "pedagio")}
               onRowClick={handleRowClick}
               emptyMessage="Nenhum custo de pedágio"
             />
@@ -708,7 +729,7 @@ export default function Custos() {
             </div>
             <DataTable<Custo>
               columns={columns}
-              data={filteredData.filter(c => c.tipo === "manutencao")}
+              data={paginatedData.filter(c => c.tipo === "manutencao")}
               onRowClick={handleRowClick}
               emptyMessage="Nenhum custo de manutenção"
             />
@@ -744,7 +765,7 @@ export default function Custos() {
             </div>
             <DataTable<Custo>
               columns={columns}
-              data={filteredData.filter(c => c.tipo === "outros")}
+              data={paginatedData.filter(c => c.tipo === "outros")}
               onRowClick={handleRowClick}
               emptyMessage="Nenhum outro custo"
             />
@@ -764,6 +785,80 @@ export default function Custos() {
               </p>
             </div>
           </Card>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex justify-center">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(Math.max(1, currentPage - 1));
+                    }}
+                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  const isCurrentPage = page === currentPage;
+                  const isVisible = Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages;
+
+                  if (!isVisible) {
+                    return null;
+                  }
+
+                  if (page === 2 && currentPage > 3) {
+                    return (
+                      <PaginationItem key="ellipsis-start">
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+
+                  if (page === totalPages - 1 && currentPage < totalPages - 2) {
+                    return (
+                      <PaginationItem key="ellipsis-end">
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    );
+                  }
+
+                  return (
+                    <PaginationItem key={page}>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage(page);
+                        }}
+                        isActive={isCurrentPage}
+                      >
+                        {page}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCurrentPage(Math.min(totalPages, currentPage + 1));
+                    }}
+                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+            <div className="text-xs text-muted-foreground ml-4 flex items-center">
+              Página {currentPage} de {totalPages} • {filteredData.length} registros
+            </div>
+          </div>
         )}
       </div>
 

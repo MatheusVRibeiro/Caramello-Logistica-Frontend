@@ -8,6 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 import * as fretesService from "@/services/fretes";
 import * as motoristasService from "@/services/motoristas";
 import * as caminhoesService from "@/services/caminhoes";
@@ -448,6 +457,8 @@ export default function Fretes() {
   const [fazendaFilter, setFazendaFilter] = useState("all");
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedFrete, setSelectedFrete] = useState<Frete | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [isNewFreteOpen, setIsNewFreteOpen] = useState(false);
   const [isEditingFrete, setIsEditingFrete] = useState(false);
   const [newFrete, setNewFrete] = useState({
@@ -578,7 +589,7 @@ export default function Fretes() {
         .filter((f) => !f.colheita_finalizada)
         .map((f) => ({
           id: f.id,
-          fazendaId: f.fazenda_id || f.id, // Usa fazenda_id da API, ou fallback para id
+          fazendaId: f.id, // Usa id da fazenda
           fazenda: f.fazenda,
           localizacao: f.localizacao || "",
           mercadoria: f.mercadoria,
@@ -1074,6 +1085,16 @@ export default function Fretes() {
     return matchesSearch && matchesMotorista && matchesCaminhao && matchesFazenda && matchesPeriodo;
   });
 
+  // Lógica de paginação
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
+  // Resetar para página 1 quando aplicar novos filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, motoristaFilter, caminhaoFilter, fazendaFilter, dateRange, selectedPeriodo]);
+
   const fazendasOptions = Array.from(
     new Set(fretesFiltradasPorPeriodo.map((f) => getFazendaNome(f)).filter(Boolean))
   ) as string[];
@@ -1560,11 +1581,85 @@ export default function Fretes() {
 
       <DataTable<Frete>
         columns={columns}
-        data={filteredData}
+        data={paginatedData}
         onRowClick={(item) => setSelectedFrete(item)}
         highlightNegative={(item) => toNumber(item.resultado) < 0}
         emptyMessage="Nenhum frete encontrado"
       />
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(Math.max(1, currentPage - 1));
+                  }}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                const isCurrentPage = page === currentPage;
+                const isVisible = Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages;
+
+                if (!isVisible) {
+                  return null;
+                }
+
+                if (page === 2 && currentPage > 3) {
+                  return (
+                    <PaginationItem key="ellipsis-start">
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  );
+                }
+
+                if (page === totalPages - 1 && currentPage < totalPages - 2) {
+                  return (
+                    <PaginationItem key="ellipsis-end">
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  );
+                }
+
+                return (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(page);
+                      }}
+                      isActive={isCurrentPage}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(Math.min(totalPages, currentPage + 1));
+                  }}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+          <div className="text-xs text-muted-foreground ml-4 flex items-center">
+            Página {currentPage} de {totalPages} • {filteredData.length} registros
+          </div>
+        </div>
+      )}
 
       {/* Frete Detail Modal */}
       <Dialog open={!!selectedFrete} onOpenChange={() => setSelectedFrete(null)}>

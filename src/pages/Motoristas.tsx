@@ -9,6 +9,15 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination";
 import { InputMascarado } from "@/components/InputMascarado";
 import { validarCPF, validarEmail, validarCNH, validarTelefone, apenasNumeros, formatarDataBrasileira, converterDataBrasileira, formatarCPF, formatarTelefone } from "@/utils/formatters";
 import * as motoristasService from "@/services/motoristas";
@@ -84,6 +93,8 @@ export default function Motoristas() {
   const [editedMotorista, setEditedMotorista] = useState<Partial<Motorista>>({});
   const [motoristasState, setMotoristasState] = useState<Motorista[]>([]);
   const [isLoadingMotoristas, setIsLoadingMotoristas] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
   const [errosCampos, setErrosCampos] = useState<Record<string, string>>({});
 
   // Carregar motoristas da API
@@ -352,6 +363,16 @@ export default function Motoristas() {
     return matchesSearch && matchesStatus && matchesTipo;
   });
 
+  // Lógica de paginação
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedData = filteredData.slice(startIndex, startIndex + itemsPerPage);
+
+  // Resetar para página 1 quando aplicar novos filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, tipoFilter]);
+
   const totalMotoristas = motoristasState.length;
   const totalAtivos = motoristasState.filter((m) => m.status === "ativo").length;
   const totalInativos = motoristasState.filter((m) => m.status === "inativo").length;
@@ -583,10 +604,84 @@ export default function Motoristas() {
 
       <DataTable<Motorista>
         columns={columns}
-        data={filteredData}
+        data={paginatedData}
         onRowClick={(item) => setSelectedMotorista(item)}
         emptyMessage="Nenhum motorista encontrado"
       />
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-center">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(Math.max(1, currentPage - 1));
+                  }}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                const isCurrentPage = page === currentPage;
+                const isVisible = Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages;
+
+                if (!isVisible) {
+                  return null;
+                }
+
+                if (page === 2 && currentPage > 3) {
+                  return (
+                    <PaginationItem key="ellipsis-start">
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  );
+                }
+
+                if (page === totalPages - 1 && currentPage < totalPages - 2) {
+                  return (
+                    <PaginationItem key="ellipsis-end">
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  );
+                }
+
+                return (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(page);
+                      }}
+                      isActive={isCurrentPage}
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                );
+              })}
+
+              <PaginationItem>
+                <PaginationNext
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setCurrentPage(Math.min(totalPages, currentPage + 1));
+                  }}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+          <div className="text-xs text-muted-foreground ml-4 flex items-center">
+            Página {currentPage} de {totalPages} • {filteredData.length} registros
+          </div>
+        </div>
+      )}
 
       {/* Driver Detail Modal */}
       <Dialog open={!!selectedMotorista} onOpenChange={() => setSelectedMotorista(null)}>
