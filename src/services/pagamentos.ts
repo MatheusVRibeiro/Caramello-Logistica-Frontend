@@ -5,8 +5,8 @@ const listarPagamentos = async (): Promise<ApiResponse<Pagamento[]>> => {
   try {
     const res = await api.get("/pagamentos");
     return { success: true, data: res.data.data || res.data };
-  } catch (err: any) {
-    const message = err?.response?.data?.message ?? err.message ?? "Erro ao listar pagamentos";
+  } catch (err: unknown) {
+    const message = (err as any)?.response?.data?.message ?? (err as Error).message ?? "Erro ao listar pagamentos";
     return { success: false, data: null, message };
   }
 };
@@ -15,8 +15,8 @@ const obterPagamento = async (id: string): Promise<ApiResponse<Pagamento>> => {
   try {
     const res = await api.get(`/pagamentos/${id}`);
     return { success: true, data: res.data.data || res.data };
-  } catch (err: any) {
-    const message = err?.response?.data?.message ?? err.message ?? "Erro ao obter pagamento";
+  } catch (err: unknown) {
+    const message = (err as any)?.response?.data?.message ?? (err as Error).message ?? "Erro ao obter pagamento";
     return { success: false, data: null, message };
   }
 };
@@ -25,8 +25,8 @@ const criarPagamento = async (payload: CriarPagamentoPayload): Promise<ApiRespon
   try {
     const res = await api.post("/pagamentos", payload);
     return { success: true, data: res.data.data || res.data, message: res.data.message };
-  } catch (err: any) {
-    const message = err?.response?.data?.message ?? err.message ?? "Erro ao criar pagamento";
+  } catch (err: unknown) {
+    const message = (err as any)?.response?.data?.message ?? (err as Error).message ?? "Erro ao criar pagamento";
     return { success: false, data: null, message };
   }
 };
@@ -38,8 +38,8 @@ const atualizarPagamento = async (
   try {
     const res = await api.put(`/pagamentos/${id}`, payload);
     return { success: true, data: res.data.data || res.data, message: res.data.message };
-  } catch (err: any) {
-    const message = err?.response?.data?.message ?? err.message ?? "Erro ao atualizar pagamento";
+  } catch (err: unknown) {
+    const message = (err as any)?.response?.data?.message ?? (err as Error).message ?? "Erro ao atualizar pagamento";
     return { success: false, data: null, message };
   }
 };
@@ -48,8 +48,8 @@ const deletarPagamento = async (id: string): Promise<ApiResponse<void>> => {
   try {
     await api.delete(`/pagamentos/${id}`);
     return { success: true, data: null };
-  } catch (err: any) {
-    const message = err?.response?.data?.message ?? err.message ?? "Erro ao deletar pagamento";
+  } catch (err: unknown) {
+    const message = (err as any)?.response?.data?.message ?? (err as Error).message ?? "Erro ao deletar pagamento";
     return { success: false, data: null, message };
   }
 };

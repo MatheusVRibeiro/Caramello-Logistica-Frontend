@@ -4,6 +4,8 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { DataTable } from "@/components/shared/DataTable";
+import { QuickGlanceDashboard, createFretesQuickGlanceCards } from "@/components/shared/QuickGlanceDashboard";
+import { SkeletonTable } from "@/components/shared/Skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,7 +47,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, MapPin, ArrowRight, Truck, Package, DollarSign, TrendingUp, Edit, Save, X, Weight, Info, Calendar as CalendarIcon, Fuel, Wrench, AlertCircle, FileDown, Lock, Unlock } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Plus, MapPin, ArrowRight, Truck, Package, DollarSign, TrendingUp, Edit, Save, X, Weight, Info, Calendar as CalendarIcon, Fuel, Wrench, AlertCircle, FileDown, Lock, Unlock, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -477,6 +486,7 @@ export default function Fretes() {
   const [tipoVisualizacao, setTipoVisualizacao] = useState<"mensal" | "trimestral" | "semestral" | "anual">("mensal");
   const [selectedPeriodo, setSelectedPeriodo] = useState(format(new Date(), "yyyy-MM")); // Mês atual
   const [mesesFechados, setMesesFechados] = useState<string[]>([]); // Meses que já foram fechados
+  const [filtersOpen, setFiltersOpen] = useState(false); // Controle do Sheet de filtros mobile
   
   // Dados históricos para comparação (simulado - mes anterior)
   const dadosMesAnterior = {
@@ -582,8 +592,10 @@ export default function Fretes() {
   }, [fretesState, tipoVisualizacao, selectedPeriodo]);
 
   const handleOpenNewModal = async () => {
+    toast.loading("📂 Carregando fazendas...");
     // Carregar fazendas disponíveis da API
     const res = await fazendasService.listarFazendas();
+    toast.dismiss();
     if (res.success && res.data) {
       const fazendasFormatadas: EstoqueFazenda[] = res.data
         .filter((f) => !f.colheita_finalizada)
@@ -602,8 +614,15 @@ export default function Fretes() {
           colheitaFinalizada: f.colheita_finalizada || false,
         }));
       setEstoquesFazendas(fazendasFormatadas);
+      if (fazendasFormatadas.length === 0) {
+        toast.warning("⚠️ Nenhuma fazenda com estoque disponível", {
+          description: "Todas as fazendas já finalizaram a colheita.",
+        });
+      }
     } else {
-      toast.error("Erro ao carregar fazendas");
+      toast.error("❌ Erro ao carregar fazendas", {
+        description: res.message || "Tente novamente em alguns momentos.",
+      });
       setEstoquesFazendas([]);
     }
     
@@ -642,24 +661,32 @@ export default function Fretes() {
     // Validar campos
     if (!newFrete.destino || !newFrete.motoristaId || 
         !newFrete.caminhaoId || !newFrete.fazendaId || !newFrete.toneladas || !newFrete.valorPorTonelada) {
-      toast.error("Preencha todos os campos!");
+      toast.error("❌ Preencha todos os campos obrigatórios!", {
+        description: "Verifique origem, destino, motorista, caminhão, fazenda, tonelagem e valor.",
+      });
       return;
     }
 
     if (!estoqueSelecionado) {
-      toast.error("Selecione uma fazenda com estoque disponível!");
+      toast.error("❌ Nenhuma fazenda selecionada", {
+        description: "Escolha uma fazenda com estoque disponível para continuar.",
+      });
       return;
     }
 
     const toneladas = parseFloat(newFrete.toneladas);
     if (isNaN(toneladas) || toneladas <= 0) {
-      toast.error("Tonelagem inválida!");
+      toast.error("❌ Tonelagem inválida", {
+        description: "Digite um valor maior que zero.",
+      });
       return;
     }
 
     const valorPorTonelada = parseFloat(newFrete.valorPorTonelada);
     if (isNaN(valorPorTonelada) || valorPorTonelada <= 0) {
-      toast.error("Valor por tonelada inválido!");
+      toast.error("❌ Valor por tonelada inválido", {
+        description: "Digite um valor maior que zero.",
+      });
       return;
     }
 
@@ -673,7 +700,9 @@ export default function Fretes() {
     const custoMotorista = custosPorMotorista.find(m => m.motoristaId === newFrete.motoristaId);
 
     if (!motorista || !caminhao) {
-      toast.error("Erro ao buscar dados do motorista ou caminhão!");
+      toast.error("❌ Dados incompletos", {
+        description: "Não foi possível encontrar informações do motorista ou caminhão.",
+      });
       return;
     }
 
@@ -691,7 +720,10 @@ export default function Fretes() {
     const custoEstimado = Math.floor(custoCombustivel + custoMotoristaTotal);
 
     if (isEditingFrete) {
-      toast.success("Frete atualizado com sucesso!");
+      toast.success("✅ Frete atualizado", {
+        description: `Frete ID ${selectedFrete?.id} foi atualizado com sucesso.`,
+        duration: 3000,
+      });
       setIsNewFreteOpen(false);
       return;
     }
@@ -717,37 +749,42 @@ export default function Fretes() {
     };
 
     // Criar frete via API
+    const toastId = toast.loading("📦 Criando frete...");
     const res = await fretesService.criarFrete(payload);
     
     if (res.success) {
-      toast.success(`Frete cadastrado! ID: ${res.data?.id}`);
+      toast.dismiss(toastId);
+      const receitaTotal = toneladas * valorPorTonelada;
+      toast.success("✅ Frete cadastrado com sucesso!", {
+        description: `ID: ${res.data?.id} | ${toneladas}t | R$ ${receitaTotal.toLocaleString("pt-BR")}`,
+        duration: 4000,
+      });
       
       // Incrementar volume transportado da fazenda
-      console.log("DEBUG: newFrete.fazendaId =", newFrete.fazendaId);
-      console.log("DEBUG: estoqueSelecionado =", estoqueSelecionado);
-      console.log("DEBUG: toneladas =", toneladas);
-      
       if (newFrete.fazendaId) {
-        toast.info(`Atualizando volume da fazenda (ID: ${newFrete.fazendaId}) com ${toneladas}t...`);
         const incrementRes = await fazendasService.incrementarVolumeTransportado(
           newFrete.fazendaId,
           toneladas
         );
-        console.log("DEBUG: incrementRes =", incrementRes);
         if (incrementRes.success) {
-          toast.success("✅ Volume da fazenda atualizado!");
+          toast.success("✅ Volume da fazenda atualizado!", { duration: 2000 });
         } else {
-          toast.warning("❌ Frete criado, mas não foi possível atualizar volume da fazenda: " + incrementRes.message);
+          toast.error("⚠️ Frete criado, mas volume não foi atualizado", {
+            description: incrementRes.message,
+            duration: 3000,
+          });
         }
-      } else {
-        toast.warning("⚠️ Frete criado, mas ID da fazenda não foi encontrada para atualizar volume");
       }
       
       // Recarregar fretes e fazendas para refletir mudanças
       queryClient.invalidateQueries({ queryKey: ["fretes"] });
       queryClient.invalidateQueries({ queryKey: ["fazendas"] });
     } else {
-      toast.error(res.message || "Erro ao cadastrar frete");
+      toast.dismiss(toastId);
+      toast.error("❌ Erro ao cadastrar frete", {
+        description: res.message || "Tente novamente em alguns momentos.",
+        duration: 4000,
+      });
     }
 
     setIsNewFreteOpen(false);
@@ -1300,7 +1337,7 @@ export default function Fretes() {
         title="Fretes"
         description="Receita é o valor total do frete. Custos são adicionais (pedágios, diárias, etc.)"
         actions={
-          <div className="flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-3">
             {/* Seletor de Tipo de Visualização */}
             <div className="flex items-center gap-2">
               <Label className="text-sm text-muted-foreground whitespace-nowrap">Visualizar:</Label>
@@ -1406,65 +1443,314 @@ export default function Fretes() {
 
       {/* Badge de Status do Mês */}
       {tipoVisualizacao === "mensal" && mesesFechados.includes(selectedPeriodo) && (
-        <div className="mb-4 flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
-          <Lock className="h-4 w-4 text-blue-600" />
-          <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+        <div className="mb-4 flex items-center gap-2 p-2 md:p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg">
+          <Lock className="h-4 w-4 text-blue-600 flex-shrink-0" />
+          <p className="text-xs md:text-sm font-semibold text-blue-700 dark:text-blue-400">
             Este mês está fechado. Novos fretes e edições não são permitidos.
           </p>
         </div>
       )}
 
+      {/* Dashboard de Batida de Olho - Quick Glance */}
+      <QuickGlanceDashboard
+        isLoading={isLoadingFretes}
+        cards={createFretesQuickGlanceCards({
+          fretesToday: fretesState.filter(f => {
+            const freteDate = parseDateBR(f.dataFrete);
+            const hoje = new Date();
+            return freteDate.toDateString() === hoje.toDateString();
+          }).length,
+          fretesTodaySacas: fretesState
+            .filter(f => {
+              const freteDate = parseDateBR(f.dataFrete);
+              const hoje = new Date();
+              return freteDate.toDateString() === hoje.toDateString();
+            })
+            .reduce((acc, f) => acc + f.quantidadeSacas, 0),
+          pendingPayments: fretesState.filter(f => f.resultado > 0).length,
+          pendingPaymentsValue: fretesState
+            .filter(f => f.resultado > 0)
+            .reduce((acc, f) => acc + toNumber(f.resultado), 0),
+          tasksOverdue: 0, // Placeholder
+          fleetUtilization: Math.round((caminhoesState.filter(c => c.status === "em_viagem").length / caminhoesState.length) * 100) || 0,
+          isLoading: isLoadingFretes,
+        })}
+      />
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
-        <Card className="p-4 bg-muted/40">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 md:gap-4 mb-6">
+        <Card className="p-3 md:p-4 bg-muted/40">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-base font-semibold text-muted-foreground">Fretes no período</p>
-            <Package className="h-5 w-5 text-muted-foreground/60" />
+            <p className="text-xs md:text-base font-semibold text-muted-foreground">Fretes no período</p>
+            <Package className="h-4 w-4 md:h-5 md:w-5 text-muted-foreground/60" />
           </div>
-          <p className="text-3xl font-bold">{filteredData.length}</p>
+          <p className="text-2xl md:text-3xl font-bold">{filteredData.length}</p>
         </Card>
-        <Card className="p-4 bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900">
+        <Card className="p-3 md:p-4 bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-base font-semibold text-muted-foreground">Toneladas</p>
-            <Weight className="h-5 w-5 text-purple-600" />
+            <p className="text-xs md:text-base font-semibold text-muted-foreground">Toneladas</p>
+            <Weight className="h-4 w-4 md:h-5 md:w-5 text-purple-600" />
           </div>
-          <p className="text-3xl font-bold text-purple-600">
+          <p className="text-2xl md:text-3xl font-bold text-purple-600">
             {filteredData.reduce((acc, f) => acc + toNumber(f.toneladas), 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}t
           </p>
-          <p className="text-sm font-medium text-purple-600/70 mt-1">
+          <p className="text-xs md:text-sm font-medium text-purple-600/70 mt-1">
             {filteredData.reduce((acc, f) => acc + toNumber(f.quantidadeSacas), 0).toLocaleString("pt-BR")} sacas
           </p>
         </Card>
-        <Card className="p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">
+        <Card className="p-3 md:p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-base font-semibold text-muted-foreground">Receita total</p>
-            <DollarSign className="h-5 w-5 text-blue-600" />
+            <p className="text-xs md:text-base font-semibold text-muted-foreground">Receita total</p>
+            <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
           </div>
-          <p className="text-3xl font-bold text-blue-600">
+          <p className="text-xl md:text-3xl font-bold text-blue-600">
             R$ {filteredData.reduce((acc, f) => acc + toNumber(f.receita), 0).toLocaleString("pt-BR")}
           </p>
         </Card>
-        <Card className="p-4 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900">
+        <Card className="p-3 md:p-4 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-base font-semibold text-muted-foreground">Custos adicionais</p>
-            <AlertCircle className="h-5 w-5 text-red-600" />
+            <p className="text-xs md:text-base font-semibold text-muted-foreground">Custos adicionais</p>
+            <AlertCircle className="h-4 w-4 md:h-5 md:w-5 text-red-600" />
           </div>
-          <p className="text-3xl font-bold text-red-600">
+          <p className="text-xl md:text-3xl font-bold text-red-600">
             R$ {filteredData.reduce((acc, f) => acc + toNumber(f.custos), 0).toLocaleString("pt-BR")}
           </p>
         </Card>
-        <Card className="p-4 bg-profit/5 border-profit/20">
+        <Card className="p-3 md:p-4 bg-profit/5 border-profit/20 col-span-2 md:col-span-1">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-base font-semibold text-muted-foreground">Lucro líquido</p>
-            <TrendingUp className="h-5 w-5 text-profit" />
+            <p className="text-xs md:text-base font-semibold text-muted-foreground">Lucro líquido</p>
+            <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-profit" />
           </div>
-          <p className="text-3xl font-bold text-profit">
+          <p className="text-xl md:text-3xl font-bold text-profit">
             R$ {filteredData.reduce((acc, f) => acc + toNumber(f.resultado), 0).toLocaleString("pt-BR")}
           </p>
         </Card>
       </div>
 
+      {/* Filters - Desktop & Mobile */}
+      {/* Mobile: Sheet Button */}
+      <div className="lg:hidden mb-4">
+        <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" className="w-full gap-2">
+              <Filter className="h-4 w-4" />
+              Filtros Avançados
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[85vh]">
+            <SheetHeader>
+              <SheetTitle>Filtros e Configurações</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(85vh-100px)]">
+              {/* Tipo de Visualização */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Tipo de Visualização</Label>
+                <Select 
+                  value={tipoVisualizacao} 
+                  onValueChange={(value) => {
+                    setTipoVisualizacao(value as any);
+                    setTimeout(() => {
+                      const hoje = new Date();
+                      let periodoIdeal = "";
+                      
+                      if (value === "mensal") {
+                        periodoIdeal = format(hoje, "yyyy-MM");
+                      } else if (value === "trimestral") {
+                        const trimestre = Math.ceil((hoje.getMonth() + 1) / 3);
+                        periodoIdeal = `${hoje.getFullYear()}-T${trimestre}`;
+                      } else if (value === "semestral") {
+                        const semestre = hoje.getMonth() + 1 <= 6 ? 1 : 2;
+                        periodoIdeal = `${hoje.getFullYear()}-S${semestre}`;
+                      } else if (value === "anual") {
+                        periodoIdeal = String(hoje.getFullYear());
+                      }
+                      
+                      setSelectedPeriodo(periodoIdeal);
+                    }, 0);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mensal">Mensal</SelectItem>
+                    <SelectItem value="trimestral">Trimestral</SelectItem>
+                    <SelectItem value="semestral">Semestral</SelectItem>
+                    <SelectItem value="anual">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Seletor de Período */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Período</Label>
+                <Select value={selectedPeriodo} onValueChange={setSelectedPeriodo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o período" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {periodosDisponiveis.length === 0 ? (
+                      <SelectItem value="sem-dados" disabled>Nenhum dado disponível</SelectItem>
+                    ) : (
+                      periodosDisponiveis.map((periodo) => (
+                        <SelectItem key={periodo} value={periodo}>
+                          {formatPeriodoLabel(periodo)}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Separator />
+
+              {/* Filtro Motoristas */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Motoristas</Label>
+                <Select value={motoristaFilter} onValueChange={setMotoristaFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {Array.isArray(motoristasState) && motoristasState.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Filtro Placas */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Placas</Label>
+                <Select value={caminhaoFilter} onValueChange={setCaminhaoFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    {Array.isArray(caminhoesState) && caminhoesState.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.placa}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Filtro Fazendas */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Fazendas</Label>
+                <Select value={fazendaFilter} onValueChange={setFazendaFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {fazendasOptions.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Filtro Período */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Período</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dateRange?.from && !dateRange?.to && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateRange?.from
+                        ? `${format(dateRange.from, "dd/MM")} - ${dateRange.to ? format(dateRange.to, "dd/MM") : "..."}`
+                        : "Selecionar"
+                      }
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={1}
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              
+              <Separator />
+
+              {/* Ações */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Ações</Label>
+                <div className="space-y-2">
+                  {/* Botão Exportar PDF */}
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      handleExportarPDF();
+                      setFiltersOpen(false);
+                    }} 
+                    className="w-full gap-2"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Exportar PDF
+                  </Button>
+
+                  {/* Botão Fechar/Abrir Mês (apenas para mensal) */}
+                  {tipoVisualizacao === "mensal" && (
+                    <Button
+                      variant={mesesFechados.includes(selectedPeriodo) ? "outline" : "secondary"}
+                      onClick={() => {
+                        handleToggleFecharMes();
+                        setFiltersOpen(false);
+                      }}
+                      className="w-full gap-2"
+                    >
+                      {mesesFechados.includes(selectedPeriodo) ? (
+                        <>
+                          <Unlock className="h-4 w-4" />
+                          Reabrir Mês
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-4 w-4" />
+                          Fechar Mês
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Botões de ação */}
+              <div className="pt-4 flex gap-2">
+                <Button variant="outline" onClick={clearFilters} className="flex-1">
+                  Limpar
+                </Button>
+                <Button onClick={() => setFiltersOpen(false)} className="flex-1">
+                  Aplicar
+                </Button>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+
+      {/* Desktop: Inline Filters */}
       <FilterBar
+        className="hidden lg:flex"
         searchValue={search}
         onSearchChange={setSearch}
         searchPlaceholder="Buscar por ID, origem, destino ou motorista..."
@@ -1551,57 +1837,101 @@ export default function Fretes() {
         </Button>
       </FilterBar>
 
-      {/* Debug Info */}
-      {(isLoadingMotoristas || isLoadingCaminhoes || isLoadingFretes) && (
-        <div className="flex justify-center items-center py-12 text-muted-foreground">
-          Carregando dados...
+      {/* FAB: Novo Frete (Mobile Only) */}
+      <Button
+        onClick={handleOpenNewModal}
+        disabled={tipoVisualizacao === "mensal" && mesesFechados.includes(selectedPeriodo)}
+        className="lg:hidden fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg p-0"
+        size="icon"
+        aria-label="Novo Frete"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
+
+      {/* Loading State */}
+      {isLoadingFretes && (
+        <div className="space-y-4">
+          <SkeletonTable rows={5} />
+          <div className="flex justify-center items-center py-8 text-muted-foreground gap-2">
+            <div className="animate-spin h-5 w-5 border-2 border-primary border-r-transparent rounded-full" />
+            <span className="text-sm font-medium">Carregando fretes...</span>
+          </div>
         </div>
       )}
       
-      {!isLoadingMotoristas && !isLoadingCaminhoes && !isLoadingFretes && (
-        <div className="mb-4 p-3 bg-muted rounded-lg text-xs space-y-1">
-          <div className="text-muted-foreground">
-            <strong>Debug:</strong> {motoristasState.length} motoristas • {caminhoesState.length} caminhões • {fretesState.length} fretes carregados
+      {/* Error/Empty State */}
+      {!isLoadingMotoristas && !isLoadingCaminhoes && !isLoadingFretes && fretesState.length === 0 && (
+        <Card className="p-8 text-center border-dashed">
+          <div className="flex flex-col items-center gap-3">
+            <Package className="h-12 w-12 text-muted-foreground/40" />
+            <h3 className="text-lg font-semibold">Nenhum frete encontrado</h3>
+            <p className="text-sm text-muted-foreground">Comece criando seu primeiro frete</p>
           </div>
-          <div className="text-muted-foreground">
-            <strong>Período "{selectedPeriodo}":</strong> {fretesFiltradasPorPeriodo.length} fretes filtrados • {filteredData.length} após todos os filtros
-          </div>
-          {fretesState.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              <strong>Datas dos fretes:</strong> {fretesState.map(f => f.dataFrete).join(", ")}
-            </div>
-          )}
-          {motoristasState.length > 0 && (
-            <div className="text-xs text-muted-foreground">
-              <strong>Motoristas com caminhão fixo:</strong> {motoristasState.filter(m => m.caminhao_atual).map(m => `${m.nome} (${m.caminhao_atual})`).join(", ") || "Nenhum"}
-            </div>
-          )}
-        </div>
+        </Card>
       )}
 
-      <DataTable<Frete>
-        columns={columns}
-        data={paginatedData}
-        onRowClick={(item) => setSelectedFrete(item)}
-        highlightNegative={(item) => toNumber(item.resultado) < 0}
-        emptyMessage="Nenhum frete encontrado"
-      />
+      {/* Data Table */}
+      {!isLoadingFretes && fretesState.length > 0 && (
+        <>
+          <DataTable<Frete>
+            columns={columns}
+            data={paginatedData}
+            onRowClick={(item) => setSelectedFrete(item)}
+            highlightNegative={(item) => toNumber(item.resultado) < 0}
+            emptyMessage="Nenhum frete encontrado com os filtros aplicados"
+            mobileCardTitle={(item) => (
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-primary">{item.id}</span>
+                <span className="text-xs text-muted-foreground">{item.dataFrete}</span>
+              </div>
+            )}
+          />
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-6 flex justify-center">
-          <Pagination>
-            <PaginationContent>
-              <PaginationItem>
-                <PaginationPrevious
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage(Math.max(1, currentPage - 1));
-                  }}
-                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                />
-              </PaginationItem>
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <>
+              {/* Mobile Pagination: Simple Prev/Next */}
+              <div className="mt-6 md:hidden">
+                <div className="flex items-center justify-between mb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-muted-foreground font-medium">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Próxima
+                  </Button>
+                </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  {filteredData.length} registros
+                </p>
+              </div>
+
+              {/* Desktop Pagination: Full */}
+              <div className="mt-6 hidden md:flex items-center justify-center gap-4">
+                <Pagination>
+                  <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage(Math.max(1, currentPage - 1));
+                      }}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
 
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
                 const isCurrentPage = page === currentPage;
@@ -1655,10 +1985,13 @@ export default function Fretes() {
               </PaginationItem>
             </PaginationContent>
           </Pagination>
-          <div className="text-xs text-muted-foreground ml-4 flex items-center">
+          <div className="text-xs text-muted-foreground flex items-center">
             Página {currentPage} de {totalPages} • {filteredData.length} registros
           </div>
-        </div>
+              </div>
+            </>
+          )}
+        </>
       )}
 
       {/* Frete Detail Modal */}

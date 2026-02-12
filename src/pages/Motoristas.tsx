@@ -325,8 +325,6 @@ export default function Motoristas() {
       tipo_conta: editedMotorista.tipo_conta,
     };
 
-    console.log("📤 Payload enviado para API:", payload);
-
     try {
       const res = await motoristasService.criarMotorista(payload);
       

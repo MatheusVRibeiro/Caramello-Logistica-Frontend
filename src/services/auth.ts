@@ -55,7 +55,7 @@ export async function login(email: string, senha: string): Promise<ApiResponse<L
     }
     
     return { success: false, data: null, message: "Resposta inválida do servidor" };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro na autenticação";
     return { success: false, data: null, message };
   }
@@ -73,7 +73,7 @@ export async function register(nome: string, email: string, senha: string): Prom
     }
     
     return { success: false, data: null, message: "Resposta inválida do servidor" };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro no registro";
     return { success: false, data: null, message };
   }

@@ -7,7 +7,7 @@ export async function listarMotoristas(): Promise<ApiResponse<Motorista[]>> {
     // Backend retorna {success, message, data: [...]}
     // Então res.data.data contém o array de motoristas
     return { success: true, data: res.data.data || res.data };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro ao listar motoristas";
     return { success: false, data: null, message };
   }
@@ -18,7 +18,7 @@ export async function criarMotorista(payload: Record<string, any>): Promise<ApiR
     const res = await api.post("/motoristas", payload);
     // Backend retorna {success, message, data: {...}}
     return { success: true, data: res.data.data || res.data };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro ao criar motorista";
     return { success: false, data: null, message };
   }

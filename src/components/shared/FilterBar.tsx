@@ -2,12 +2,14 @@ import { ReactNode } from "react";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface FilterBarProps {
   searchValue: string;
   onSearchChange: (value: string) => void;
   searchPlaceholder?: string;
   children?: ReactNode;
+  className?: string;
 }
 
 export function FilterBar({
@@ -15,9 +17,10 @@ export function FilterBar({
   onSearchChange,
   searchPlaceholder = "Buscar...",
   children,
+  className,
 }: FilterBarProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-end gap-3 mb-6">
+    <div className={cn("flex flex-col sm:flex-row items-end gap-3 mb-6", className)}>
       <div className="flex-1 max-w-sm">
         <label className="text-xs text-muted-foreground block mb-1">Buscar</label>
         <div className="relative">

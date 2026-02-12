@@ -52,6 +52,20 @@ interface EstoqueFazenda {
   safra: string;
 }
 
+// Interface para Frete Simulado
+interface FreteSimulado {
+  id: string;
+  status: "em_transito" | "concluido" | "pendente" | "cancelado";
+  receita: number;
+  custos: number;
+  resultado: number;
+  quantidadeSacas: number;
+  motorista: string;
+  motoristaId: string;
+  mes: string;
+  data_frete?: string; // Data do frete em formato ISO
+}
+
 // Simulação de dados de fretes - em produção virá do backend
 const fretesSimulados = [
   { id: "FRETE-2026-001", status: "em_transito", receita: 6750, custos: 1720, resultado: 5030, quantidadeSacas: 450, motorista: "Carlos Silva", motoristaId: "1", mes: "jan" },
@@ -170,46 +184,48 @@ export default function Dashboard() {
     const mesAtual = hoje.getMonth(); // 0-11
     const anoAtual = hoje.getFullYear();
     
-    const fretesJaneiro = fretesParaCalcular.filter((f: any) => {
+    const fretesJaneiro = fretesParaCalcular.filter((f: FreteSimulado) => {
       if (f.mes === "jan") return f.status !== "cancelado"; // Dados simulados
+      if (!f.data_frete) return false;
       const dataFrete = new Date(f.data_frete);
       return dataFrete.getMonth() === 0 && dataFrete.getFullYear() === 2025; // Janeiro 2025
     });
     
-    const fretesDezembro = fretesParaCalcular.filter((f: any) => {
+    const fretesDezembro = fretesParaCalcular.filter((f: FreteSimulado) => {
       if (f.mes === "dez") return true; // Dados simulados
+      if (!f.data_frete) return false;
       const dataFrete = new Date(f.data_frete);
       return dataFrete.getMonth() === 11 && dataFrete.getFullYear() === 2024; // Dezembro 2024
     });
     
-    // Fretes ativos: assumir que todos são ativos se vieram do backend
-    const fretesAtivos = fretesParaCalcular.filter((f: any) => {
+    const fretesAtivos = fretesParaCalcular.filter((f: FreteSimulado) => {
       if (f.status === "em_transito") return true;
       // Se não tem status, considerar ativos os fretes dos últimos 7 dias
+      if (!f.data_frete) return false;
       const dataFrete = new Date(f.data_frete);
       const diff = hoje.getTime() - dataFrete.getTime();
       return diff < 7 * 24 * 60 * 60 * 1000;
     }).length;
     
     // KPIs de Fretes (Janeiro / Atual)
-    const totalSacasJan = fretesJaneiro.reduce((acc: number, f: any) => acc + (Number(f.quantidade_sacas) || 0), 0);
-    const totalReceitaJan = fretesJaneiro.reduce((acc: number, f: any) => acc + (Number(f.receita) || 0), 0);
-    const totalCustosJan = fretesJaneiro.reduce((acc: number, f: any) => acc + (Number(f.custos) || 0), 0);
+    const totalSacasJan = fretesJaneiro.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.quantidadeSacas) || 0), 0);
+    const totalReceitaJan = fretesJaneiro.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.receita) || 0), 0);
+    const totalCustosJan = fretesJaneiro.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.custos) || 0), 0);
     const totalResultadoJan = totalReceitaJan - totalCustosJan;
     
     // KPIs de Fretes (Dezembro / Previous)
-    const totalSacasDez = fretesDezembro.reduce((acc: number, f: any) => acc + (Number(f.quantidade_sacas) || 0), 0);
-    const totalReceitaDez = fretesDezembro.reduce((acc: number, f: any) => acc + (Number(f.receita) || 0), 0);
-    const totalCustosDez = fretesDezembro.reduce((acc: number, f: any) => acc + (Number(f.custos) || 0), 0);
+    const totalSacasDez = fretesDezembro.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.quantidadeSacas) || 0), 0);
+    const totalReceitaDez = fretesDezembro.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.receita) || 0), 0);
+    const totalCustosDez = fretesDezembro.reduce((acc: number, f: FreteSimulado) => acc + (Number(f.custos) || 0), 0);
     const totalResultadoDez = totalReceitaDez - totalCustosDez;
     
     // Custo médio por saca (apenas fretes concluídos com custo)
-    const fretesComCusto = fretesJaneiro.filter(f => ((f as any).custos || 0) > 0);
-    const sacasComCusto = fretesComCusto.reduce((acc: number, f: any) => acc + ((f as any).quantidadeSacas || 0), 0);
+    const fretesComCusto = fretesJaneiro.filter(f => (f.custos || 0) > 0);
+    const sacasComCusto = fretesComCusto.reduce((acc: number, f: FreteSimulado) => acc + (f.quantidadeSacas || 0), 0);
     const custoPorSaca = sacasComCusto > 0 ? totalCustosJan / sacasComCusto : 0;
     
-    const fretesComCustoDez = fretesDezembro.filter(f => ((f as any).custos || 0) > 0);
-    const sacasComCustoDez = fretesComCustoDez.reduce((acc: number, f: any) => acc + ((f as any).quantidadeSacas || 0), 0);
+    const fretesComCustoDez = fretesDezembro.filter(f => (f.custos || 0) > 0);
+    const sacasComCustoDez = fretesComCustoDez.reduce((acc: number, f: FreteSimulado) => acc + (f.quantidadeSacas || 0), 0);
     const custoPorSacaDez = sacasComCustoDez > 0 ? totalCustosDez / sacasComCustoDez : 0;
     
     // Taxa de ocupação da frota
@@ -224,7 +240,7 @@ export default function Dashboard() {
     let totalEstoquesToneladas = 0;
     let totalEstoquesValor = 0;
 
-    fazendaParaCalcular.forEach((fazenda: any) => {
+    fazendaParaCalcular.forEach((fazenda: Record<string, any>) => {
       // Usar o campo correto: total_sacas_carregadas
       const sacas = Number(fazenda.total_sacas_carregadas || 0);
       
@@ -243,7 +259,7 @@ export default function Dashboard() {
     });
 
     const totalEstoquesSacasInicial = totalEstoquesSacas;
-    const fazendaAtivas = fazendaParaCalcular.filter((e: any) => {
+    const fazendaAtivas = fazendaParaCalcular.filter((e: Record<string, any>) => {
       const sacas = Number(e.quantidade_sacas || e.total_sacas || e.sacas || 0);
       return sacas > 0;
     }).length;
@@ -327,7 +343,7 @@ export default function Dashboard() {
   const driversRanking = useMemo(() => {
     const motoristasReceitaMap: Record<string, { name: string; revenue: number; trips: number }> = {};
     
-    fretes.forEach((frete: any) => {
+    fretes.forEach((frete: Record<string, any>) => {
       // Suportar campos do backend (motorista_nome) e simulados (motorista)
       const motoristaNome = frete.motorista_nome || frete.motorista || "Desconhecido";
       const motoristaId = frete.motorista_id || frete.motoristaId || motoristaNome;
@@ -629,7 +645,7 @@ export default function Dashboard() {
           </DialogHeader>
           <div className="space-y-6">
             {/* Estatísticas Rápidas */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <p className="text-sm text-muted-foreground">Total (6 meses)</p>
                 <p className="text-2xl font-bold text-primary">
@@ -649,7 +665,7 @@ export default function Dashboard() {
             </div>
 
             {/* Gráfico de Barras */}
-            <div className="h-80">
+            <div className="h-64 md:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dadosSacasMensais}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
@@ -694,7 +710,7 @@ export default function Dashboard() {
           </DialogHeader>
           <div className="space-y-6">
             {/* Estatísticas Rápidas */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-4 bg-loss/5 rounded-lg border border-loss/20">
                 <p className="text-sm text-muted-foreground">Custo Atual</p>
                 <p className="text-2xl font-bold text-loss">
@@ -719,7 +735,7 @@ export default function Dashboard() {
             </div>
 
             {/* Gráfico de Linha */}
-            <div className="h-80">
+            <div className="h-64 md:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={dadosCustoMensal}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
@@ -787,7 +803,7 @@ export default function Dashboard() {
           </DialogHeader>
           <div className="space-y-6">
             {/* Estatísticas Rápidas */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-active/10 rounded-lg border border-active/20">
                 <p className="text-sm text-muted-foreground">Ocupação Atual</p>
                 <p className="text-2xl font-bold text-active">
@@ -809,7 +825,7 @@ export default function Dashboard() {
             </div>
 
             {/* Gráfico de Área */}
-            <div className="h-80">
+            <div className="h-64 md:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={dadosOcupacaoSemanal}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
@@ -871,7 +887,7 @@ export default function Dashboard() {
           </DialogHeader>
           <div className="space-y-6">
             {/* Estatísticas Rápidas */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <p className="text-sm text-muted-foreground">Receita Jan/25</p>
                 <p className="text-2xl font-bold text-primary">
@@ -893,7 +909,7 @@ export default function Dashboard() {
             </div>
 
             {/* Gráfico de Barras Empilhadas */}
-            <div className="h-80">
+            <div className="h-64 md:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dadosResultadoMensal}>
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />

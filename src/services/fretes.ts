@@ -22,7 +22,7 @@ export async function listarFretes(): Promise<ApiResponse<Frete[]>> {
     }
     
     return { success: false, data: null, message: "Resposta inválida do servidor" };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro ao listar fretes";
     return { success: false, data: null, message };
   }
@@ -41,7 +41,7 @@ export async function criarFrete(payload: CriarFretePayload): Promise<ApiRespons
     }
     
     return { success: false, data: null, message: "Resposta inválida do servidor" };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err?.response?.data?.error ?? err.message ?? "Erro ao criar frete";
     return { success: false, data: null, message };
   }
@@ -56,7 +56,7 @@ export async function obterFrete(id: string): Promise<ApiResponse<Frete>> {
     }
     
     return { success: false, data: null, message: "Frete não encontrado" };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro ao obter frete";
     return { success: false, data: null, message };
   }

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -36,15 +37,24 @@ export default function Login() {
     setError("");
 
     if (!email.trim() || !password.trim()) {
+      toast.error("❌ Campos obrigatórios vazios", {
+        description: "Preencha email e senha para continuar.",
+      });
       setError("Preencha todos os campos");
       return;
     }
 
     setIsSubmitting(true);
+    const toastId = toast.loading("🔓 Autenticando...");
     
     const success = await login(email, password);
 
     if (success) {
+      toast.dismiss(toastId);
+      toast.success("✅ Login realizado com sucesso!", {
+        description: "Bem-vindo de volta!",
+        duration: 3000,
+      });
       if (rememberMe) {
         localStorage.setItem("@RNLogistica:savedEmail", email);
       } else {
@@ -52,6 +62,11 @@ export default function Login() {
       }
       navigate(from, { replace: true });
     } else {
+      toast.dismiss(toastId);
+      toast.error("❌ Falha na autenticação", {
+        description: "Verifique suas credenciais e tente novamente.",
+        duration: 4000,
+      });
       setError("Usuário ou senha inválidos");
       setIsSubmitting(false);
     }

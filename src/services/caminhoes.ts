@@ -7,7 +7,7 @@ export async function listarCaminhoes(): Promise<ApiResponse<Caminhao[]>> {
     // Backend retorna {success, message, data: [...]}
     // Então res.data.data contém o array de caminhões
     return { success: true, data: res.data.data || res.data };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro ao listar caminhões";
     return { success: false, data: null, message };
   }
@@ -17,7 +17,7 @@ export async function criarCaminhao(payload: CriarCaminhaoPayload): Promise<ApiR
   try {
     const res = await api.post("/frota", payload);
     return { success: true, data: res.data.data || res.data };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro ao criar caminhão";
     return { success: false, data: null, message };
   }
@@ -27,7 +27,7 @@ export async function atualizarCaminhao(id: string, payload: Partial<CriarCaminh
   try {
     const res = await api.put(`/frota/${id}`, payload);
     return { success: true, data: res.data.data || res.data };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro ao atualizar caminhão";
     return { success: false, data: null, message };
   }
@@ -37,7 +37,7 @@ export async function deletarCaminhao(id: string): Promise<ApiResponse<void>> {
   try {
     await api.delete(`/frota/${id}`);
     return { success: true, data: null };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const message = err?.response?.data?.message ?? err.message ?? "Erro ao deletar caminhão";
     return { success: false, data: null, message };
   }

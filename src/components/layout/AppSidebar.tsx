@@ -12,10 +12,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  X,
   CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -32,40 +39,38 @@ const navigation = [
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const location = useLocation();
-
-  // Close mobile sidebar when route changes
-  const closeMobile = () => setMobileOpen(false);
 
   return (
     <>
-      {/* Mobile menu button */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-40 p-2 rounded-lg bg-card border shadow-sm"
-        aria-label="Abrir menu"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+      {/* Mobile Trigger Button - Floating Action Button */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetTrigger asChild>
+          <Button
+            variant="outline"
+            size="icon"
+            className="lg:hidden fixed top-4 left-4 z-40 shadow-lg bg-card hover:bg-accent"
+            aria-label="Abrir menu"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-64 p-0 bg-sidebar text-sidebar-foreground">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Menu de Navegação</SheetTitle>
+          </SheetHeader>
+          <SidebarContent collapsed={false} onNavigate={() => setMobileOpen(false)} />
+        </SheetContent>
+      </Sheet>
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-40 bg-black/50 animate-fade-in"
-          onClick={closeMobile}
-        />
-      )}
-
-      {/* Sidebar */}
+      {/* Desktop Sidebar */}
       <aside
         className={cn(
           "flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out",
-          // Desktop styles
           "hidden lg:flex",
           collapsed ? "w-16" : "w-64"
         )}
       >
-        <SidebarContent collapsed={collapsed} onNavigate={closeMobile} />
+        <SidebarContent collapsed={collapsed} onNavigate={() => {}} />
         
         {/* Collapse Button */}
         <div className="p-2 border-t border-sidebar-border">
@@ -84,25 +89,6 @@ export function AppSidebar() {
             )}
           </button>
         </div>
-      </aside>
-
-      {/* Mobile sidebar */}
-      <aside
-        className={cn(
-          "lg:hidden fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-sidebar text-sidebar-foreground transition-transform duration-300 ease-in-out",
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        {/* Close button */}
-        <button
-          onClick={closeMobile}
-          className="absolute top-4 right-4 p-1 rounded-lg text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
-          aria-label="Fechar menu"
-        >
-          <X className="h-5 w-5" />
-        </button>
-
-        <SidebarContent collapsed={false} onNavigate={closeMobile} />
       </aside>
     </>
   );

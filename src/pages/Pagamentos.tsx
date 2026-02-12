@@ -1112,7 +1112,10 @@ export default function Pagamentos() {
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground">{item.motoristaNome}</p>
-            <p className="text-xs text-muted-foreground">{item.dataFrete}</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground font-medium">{item.dataFrete}</p>
+            </div>
           </div>
         </div>
       ),
@@ -1527,11 +1530,14 @@ export default function Pagamentos() {
                           .join("")}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
+                    <div className="flex-1">
                       <p className="text-lg font-bold">{selectedPagamento.motoristaNome}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Período: {selectedPagamento.dataFrete}
-                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Calendar className="h-4 w-4 text-primary" />
+                        <p className="text-sm font-medium">
+                          {selectedPagamento.dataFrete}
+                        </p>
+                      </div>
                     </div>
                   </Card>
                 </div>
