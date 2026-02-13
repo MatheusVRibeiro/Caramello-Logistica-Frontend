@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -86,6 +87,7 @@ const tipoMotoristaConfig = {
 };
 
 export default function Motoristas() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [tipoFilter, setTipoFilter] = useState<string>("all");
@@ -366,7 +368,18 @@ export default function Motoristas() {
       
       if (res.success) {
         toast.success("Motorista cadastrado com sucesso!");
-        await carregarMotoristas(); // Recarregar lista
+        // Recarregar lista local
+        await carregarMotoristas();
+        // Garantir que outras telas (ex: Frota) atualizem o cache do react-query
+        queryClient.invalidateQueries({ queryKey: ["motoristas"] });
+        // Certificar que o motorista novo não fique vinculado a um caminhão automaticamente
+        if (res.data?.id) {
+          // Remove qualquer vínculo de caminhão (API aceita null para desvincular)
+          motoristasService.atualizarMotorista(res.data.id, { caminhao_atual: null }).then(() => {
+            queryClient.invalidateQueries({ queryKey: ["motoristas"] });
+            carregarMotoristas();
+          }).catch(() => {});
+        }
         setIsModalOpen(false);
         setErrosCampos({});
       } else {
@@ -451,10 +464,8 @@ export default function Motoristas() {
               <Badge variant={statusConfig[item.status].variant} className="text-[10px]">
                 {statusConfig[item.status].label}
               </Badge>
-              <Badge variant={tipoMotoristaConfig[item.tipo].variant} className="text-[10px]">
-                {tipoMotoristaConfig[item.tipo].label}
-              </Badge>
             </div>
+            <p className="text-xs text-muted-foreground mt-1">{tipoMotoristaConfig[item.tipo].label}</p>
             {item.caminhao_atual && (
               <div className="flex items-center gap-1.5 mt-1.5 px-2 py-1 bg-blue-50 dark:bg-blue-950/40 rounded-md w-fit">
                 <Truck className="h-3 w-3 text-blue-600 dark:text-blue-400" />
@@ -871,13 +882,8 @@ export default function Motoristas() {
                         >
                           {statusConfig[selectedMotorista.status].label}
                         </Badge>
-                        <Badge
-                          variant={tipoMotoristaConfig[selectedMotorista.tipo].variant}
-                          className="text-sm"
-                        >
-                          {tipoMotoristaConfig[selectedMotorista.tipo].label}
-                        </Badge>
                       </div>
+                      <p className="text-sm text-muted-foreground mt-2">{tipoMotoristaConfig[selectedMotorista.tipo].label}</p>
                     </div>
                   </div>
                 </div>
