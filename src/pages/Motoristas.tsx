@@ -53,7 +53,7 @@ import type { Motorista } from "@/types";
 // Payload para criar motorista
 interface CriarMotoristaPayload {
   nome: string;
-  cpf: string;
+  cpf?: string | null;
   telefone: string;
   email: string;
   cnh: string;
