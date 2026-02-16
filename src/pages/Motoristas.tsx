@@ -55,10 +55,10 @@ interface CriarMotoristaPayload {
   nome: string;
   cpf?: string | null;
   telefone: string;
-  email?: string | null;
-  cnh?: string | null;
-  cnh_validade?: string | null;
-  cnh_categoria?: "A" | "B" | "C" | "D" | "E" | null;
+  email: string;
+  cnh: string;
+  cnh_validade: string;
+  cnh_categoria: "A" | "B" | "C" | "D" | "E";
   tipo: "proprio" | "terceirizado" | "agregado";
   endereco?: string | null;
   status?: "ativo" | "inativo" | "ferias";
@@ -69,7 +69,6 @@ interface CriarMotoristaPayload {
   agencia?: string | null;
   conta?: string | null;
   tipo_conta?: "corrente" | "poupanca" | null;
-  veiculo_id?: string | null;
 }
 
 // Caminhões serão carregados via API
@@ -215,19 +214,33 @@ export default function Motoristas() {
       novosErros.status = "Status é obrigatório";
     }
 
-    if (editedMotorista.cpf?.trim()) {
+    if (!editedMotorista.cpf?.trim()) {
+      novosErros.cpf = "CPF é obrigatório";
+    } else {
       const cpfLimpo = apenasNumeros(editedMotorista.cpf);
       if (!validarCPF(cpfLimpo)) {
         novosErros.cpf = "CPF inválido";
       }
     }
 
-    if (editedMotorista.email?.trim() && !validarEmail(editedMotorista.email)) {
+    if (!editedMotorista.email?.trim()) {
+      novosErros.email = "E-mail é obrigatório";
+    } else if (!validarEmail(editedMotorista.email)) {
       novosErros.email = "E-mail inválido";
     }
 
-    if (editedMotorista.cnh?.trim() && !validarCNH(editedMotorista.cnh)) {
+    if (!editedMotorista.cnh?.trim()) {
+      novosErros.cnh = "CNH é obrigatória";
+    } else if (!validarCNH(editedMotorista.cnh)) {
       novosErros.cnh = "CNH deve ter 11 dígitos";
+    }
+
+    if (!editedMotorista.cnh_validade) {
+      novosErros.cnh_validade = "Validade da CNH é obrigatória";
+    }
+
+    if (!editedMotorista.cnh_categoria) {
+      novosErros.cnh_categoria = "Categoria da CNH é obrigatória";
     }
 
     if (editedMotorista.tipo_pagamento === "pix") {
@@ -260,14 +273,16 @@ export default function Motoristas() {
       return;
     }
 
+    const veiculoSelecionadoId = editedMotorista.veiculo_id || null;
+
     const payloadBase: CriarMotoristaPayload = {
       nome: editedMotorista.nome?.trim() || "",
-      cpf: editedMotorista.cpf ? apenasNumeros(editedMotorista.cpf) : null,
+      cpf: apenasNumeros(editedMotorista.cpf || ""),
       telefone: apenasNumeros(editedMotorista.telefone || ""),
-      email: editedMotorista.email || null,
-      cnh: editedMotorista.cnh ? apenasNumeros(editedMotorista.cnh) : null,
-      cnh_validade: editedMotorista.cnh_validade || null,
-      cnh_categoria: editedMotorista.cnh_categoria || null,
+      email: editedMotorista.email?.trim() || "",
+      cnh: apenasNumeros(editedMotorista.cnh || ""),
+      cnh_validade: editedMotorista.cnh_validade || "",
+      cnh_categoria: editedMotorista.cnh_categoria || "D",
       tipo: editedMotorista.tipo as "proprio" | "terceirizado" | "agregado",
       endereco: editedMotorista.endereco || null,
       status: editedMotorista.status || "ativo",
@@ -282,11 +297,15 @@ export default function Motoristas() {
       agencia: editedMotorista.tipo_pagamento === "transferencia_bancaria" ? editedMotorista.agencia || null : null,
       conta: editedMotorista.tipo_pagamento === "transferencia_bancaria" ? editedMotorista.conta || null : null,
       tipo_conta: editedMotorista.tipo_pagamento === "transferencia_bancaria" ? editedMotorista.tipo_conta || "corrente" : null,
-      veiculo_id: editedMotorista.veiculo_id || null,
     };
 
     const payload = Object.fromEntries(
-      Object.entries(payloadBase).map(([key, value]) => [key, value === "" ? null : value])
+      Object.entries(payloadBase).map(([key, value]) => {
+        if (["endereco", "chave_pix", "banco", "agencia", "conta", "tipo_conta", "chave_pix_tipo"].includes(key)) {
+          return [key, value === "" ? null : value];
+        }
+        return [key, value];
+      })
     ) as CriarMotoristaPayload;
 
     try {
@@ -295,9 +314,9 @@ export default function Motoristas() {
       if (res.success && res.data) {
         const motoristaCriadoId = res.data.id;
 
-        if (payload.veiculo_id && motoristaCriadoId) {
+        if (veiculoSelecionadoId && motoristaCriadoId) {
           try {
-            const vinculoRes = await caminhoesService.atualizarCaminhao(payload.veiculo_id, {
+            const vinculoRes = await caminhoesService.atualizarCaminhao(veiculoSelecionadoId, {
               motorista_fixo_id: motoristaCriadoId,
             });
 
