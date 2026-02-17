@@ -22,7 +22,6 @@ import {
 import { InputMascarado } from "@/components/InputMascarado";
 import { validarCPF, validarEmail, validarCNH, validarTelefone, apenasNumeros, formatarDataBrasileira, converterDataBrasileira, formatarCPF, formatarTelefone } from "@/utils/formatters";
 import * as motoristasService from "@/services/motoristas";
-import caminhoesService from "@/services/caminhoes";
 import {
   Select,
   SelectContent,
@@ -57,9 +56,7 @@ interface CriarMotoristaPayload {
   cpf?: string | null;
   telefone: string;
   email: string;
-  cnh: string;
-  cnh_validade: string;
-  cnh_categoria: "A" | "B" | "C" | "D" | "E";
+  // cnh removido do banco e do payload
   tipo: "proprio" | "terceirizado" | "agregado";
   endereco?: string | null;
   status?: "ativo" | "inativo" | "ferias";
@@ -107,26 +104,7 @@ export default function Motoristas() {
     carregarMotoristas();
   }, []);
 
-  // Caminhões carregados via API (substitui dados simulados removidos)
-  const [caminhoesState, setCaminhoesState] = useState<{ id: string; placa: string; modelo?: string }[]>([]);
 
-  const carregarCaminhoes = async () => {
-    try {
-      const res = await caminhoesService.listarCaminhoes();
-      if (res.success && Array.isArray(res.data)) {
-        setCaminhoesState(res.data as { id: string; placa: string; modelo?: string }[]);
-      } else {
-        setCaminhoesState([]);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar caminhões:", error);
-      setCaminhoesState([]);
-    }
-  };
-
-  useEffect(() => {
-    carregarCaminhoes();
-  }, []);
 
   const carregarMotoristas = async () => {
     setIsLoadingMotoristas(true);
@@ -154,12 +132,8 @@ export default function Motoristas() {
       cpf: "",
       telefone: "",
       email: "",
-      cnh: "",
-      cnh_validade: "",
-      cnh_categoria: "D",
       status: "ativo",
       tipo: "proprio",
-      veiculo_id: null,
       endereco: "",
       tipo_pagamento: "pix",
       chave_pix_tipo: "cpf",
@@ -175,11 +149,7 @@ export default function Motoristas() {
 
   const handleOpenEditModal = (motorista: Motorista) => {
     setEditedMotorista({
-      ...motorista,
-      veiculo_id: motorista.veiculo_id || null,
-      cnh_validade: motorista.cnh_validade?.length > 10 
-        ? motorista.cnh_validade.split('T')[0]
-        : motorista.cnh_validade
+      ...motorista
     });
     setIsEditing(true);
     setIsModalOpen(true);
@@ -243,20 +213,7 @@ export default function Motoristas() {
       return;
     }
 
-    // For terceirizados/agregados, ensure vehicle linked
-    if (editedMotorista.tipo !== 'proprio') {
-      if (!editedMotorista.veiculo_id) {
-        setErrosCampos({ veiculo_id: 'Vincule um veículo disponível' });
-        toast.error('Vincule um veículo disponível para motoristas terceirizados');
-        return;
-      }
-      const existe = caminhoesState.some((v) => String(v.id) === String(editedMotorista.veiculo_id));
-      if (!existe) {
-        setErrosCampos({ veiculo_id: 'Veículo inválido. Selecione um veículo disponível' });
-        toast.error('Veículo inválido. Selecione um veículo disponível');
-        return;
-      }
-    }
+
 
     // Build minimal payload for creation
     const payload: Record<string, any> = {
@@ -266,12 +223,12 @@ export default function Motoristas() {
       status: editedMotorista.status || "ativo",
       tipo_pagamento: editedMotorista.tipo_pagamento || 'pix',
     };
-
-    if (editedMotorista.tipo !== 'proprio') {
-      payload.veiculo_id = editedMotorista.veiculo_id === "none" ? null : editedMotorista.veiculo_id;
-    } else {
-      payload.veiculo_id = null;
+    // Adiciona CPF se preenchido
+    if (editedMotorista.cpf && editedMotorista.cpf.trim() !== "") {
+      payload.cpf = apenasNumeros(editedMotorista.cpf);
     }
+
+
 
     // Payment normalization
     if (payload.tipo_pagamento === 'pix') {
@@ -291,37 +248,16 @@ export default function Motoristas() {
 
     // Clean payload and convert empty strings to null for specific keys
 
+
     // Limpeza final: transforma '' em null para todos os campos
     const finalPayload = emptyToNull(payload);
-    // Remove veiculo_id se for 'none'
-    if (finalPayload.veiculo_id === 'none') {
-      delete finalPayload.veiculo_id;
-    }
 
     try {
-      // Remover veiculo_id do payload antes de criar motorista (não existe na tabela motoristas)
-      if ('veiculo_id' in finalPayload) {
-        delete finalPayload.veiculo_id;
-      }
+
       const res = await motoristasService.criarMotorista(finalPayload);
 
       if (res.success && res.data) {
-        const motoristaCriadoId = res.data.id;
 
-        if (veiculoSelecionadoId && motoristaCriadoId) {
-          try {
-            const vinculoRes = await caminhoesService.atualizarCaminhao(veiculoSelecionadoId, {
-              motorista_fixo_id: motoristaCriadoId,
-            });
-
-            if (!vinculoRes.success) {
-              toast.warning("Motorista criado, mas o vínculo com o veículo não foi concluído.");
-            }
-          } catch (vinculoError) {
-            console.error("Falha ao vincular motorista ao veículo:", vinculoError);
-            toast.warning("Motorista criado, mas houve falha ao vincular o veículo.");
-          }
-        }
 
         toast.success("Motorista cadastrado com sucesso!");
         await carregarMotoristas();
@@ -397,6 +333,8 @@ export default function Motoristas() {
                 )}
               />
               <p className="font-semibold text-foreground leading-tight">{item.nome}</p>
+              {/* Exibe o código do motorista */}
+              <span className="ml-2 font-mono text-xs text-primary">{item.codigo_motorista}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">{formatarCPF(item.cpf)}</p>
             <div className="mt-1 flex items-center gap-2">
@@ -479,10 +417,11 @@ export default function Motoristas() {
   ];
 
   // Simulated freight history
+  // Exemplo: agora o backend retorna id numérico e codigo_frete
   const historicoFretes = [
-    { id: "FRETE-2026-001", rota: "SP → RJ", data: "20/01/2025", valor: "R$ 15.000" },
-    { id: "FRETE-2026-007", rota: "PR → SC", data: "15/01/2025", valor: "R$ 8.500" },
-    { id: "FRETE-2026-015", rota: "MG → DF", data: "10/01/2025", valor: "R$ 12.000" },
+    { id: 1, codigo_frete: "FRETE-2026-001", rota: "SP → RJ", data: "20/01/2025", valor: "R$ 15.000" },
+    { id: 7, codigo_frete: "FRETE-2026-007", rota: "PR → SC", data: "15/01/2025", valor: "R$ 8.500" },
+    { id: 15, codigo_frete: "FRETE-2026-015", rota: "MG → DF", data: "10/01/2025", valor: "R$ 12.000" },
   ];
 
   return (
@@ -783,7 +722,8 @@ export default function Motoristas() {
                 size="sm"
                 onClick={() => {
                   if (selectedMotorista) {
-                    handleOpenEditModal(selectedMotorista);
+                    // Exemplo: navegação para rota de edição usando id numérico
+                    window.location.href = `/motoristas/editar/${selectedMotorista.id}`;
                     setSelectedMotorista(null);
                   }
                 }}
@@ -811,6 +751,8 @@ export default function Motoristas() {
                     </Avatar>
                     <div>
                       <p className="text-2xl font-bold mb-1">{selectedMotorista.nome}</p>
+                      {/* Exibe o código do motorista */}
+                      <p className="font-mono text-primary mb-2">{selectedMotorista.codigo_motorista}</p>
                       <p className="text-muted-foreground mb-2">{selectedMotorista.cpf}</p>
                       <div className="flex items-center gap-2">
                         <Badge
@@ -873,20 +815,7 @@ export default function Motoristas() {
                   </div>
                 </Card>
 
-                {selectedMotorista.caminhao_atual && (
-                  <Card className="p-4 border-l-4 border-l-blue-500">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Truck className="h-4 w-4 text-blue-600" />
-                      <p className="text-sm text-muted-foreground">Caminhão Atual</p>
-                    </div>
-                    <p className="font-mono font-bold text-lg text-blue-600">
-                      {selectedMotorista.caminhao_atual}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {caminhoesState.find(c => c.placa === selectedMotorista.caminhao_atual)?.modelo}
-                    </p>
-                  </Card>
-                )}
+
               </div>
 
               <Separator />
@@ -924,7 +853,8 @@ export default function Motoristas() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <span className="font-mono text-sm font-bold text-primary">{frete.id}</span>
+                          {/* Exibe o código do frete */}
+                          <span className="font-mono text-sm font-bold text-primary">{frete.codigo_frete}</span>
                           <span className="font-medium">{frete.rota}</span>
                         </div>
                         <div className="flex items-center gap-4">
@@ -1073,7 +1003,7 @@ export default function Motoristas() {
               </div>
             </div>
 
-            {/* Linha 3: Tipo e Veículo Vinculado */}
+            {/* Linha 3: Tipo */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="tipo">Tipo <span className="text-red-500">*</span></Label>
@@ -1097,26 +1027,6 @@ export default function Motoristas() {
                   </SelectContent>
                 </Select>
                 {errosCampos.tipo && <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.tipo}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="veiculo_id">Veículo Vinculado</Label>
-                <Select
-                  value={editedMotorista.veiculo_id || "none"}
-                  onValueChange={(value) => setEditedMotorista({ ...editedMotorista, veiculo_id: value === "none" ? null : value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um veículo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Nenhum</SelectItem>
-                    {caminhoesState.map((caminhao) => (
-                      <SelectItem key={caminhao.id} value={caminhao.id}>
-                        {caminhao.placa} {caminhao.modelo ? `- ${caminhao.modelo}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
 
@@ -1154,56 +1064,7 @@ export default function Motoristas() {
               </div>
             </div>
 
-            {/* Linha 5: CNH, Validade e Categoria */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <InputMascarado
-                label="CNH"
-                id="cnh"
-                tipoMascara="numero"
-                placeholder="00000000000"
-                maxLength={11}
-                value={editedMotorista.cnh || ""}
-                onChange={(e) => {
-                  setEditedMotorista({ ...editedMotorista, cnh: e.target.value });
-                  setErrosCampos({ ...errosCampos, cnh: "" });
-                }}
-                erro={errosCampos.cnh}
-              />
-
-              <div className="space-y-2">
-                <Label htmlFor="cnh_validade">Validade da CNH</Label>
-                <Input
-                  id="cnh_validade"
-                  type="date"
-                  value={editedMotorista.cnh_validade || ""}
-                  onChange={(e) => {
-                    setEditedMotorista({ ...editedMotorista, cnh_validade: e.target.value });
-                    setErrosCampos({ ...errosCampos, cnh_validade: "" });
-                  }}
-                  className={errosCampos.cnh_validade ? "border-red-500 focus-visible:ring-red-500" : ""}
-                />
-                {errosCampos.cnh_validade && <p className="text-sm text-red-500 dark:text-red-400">{errosCampos.cnh_validade}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="cnhCategoria">Categoria</Label>
-                <Select
-                  value={editedMotorista.cnh_categoria || ""}
-                  onValueChange={(value: "A" | "B" | "C" | "D" | "E") => setEditedMotorista({ ...editedMotorista, cnh_categoria: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a categoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="A">A</SelectItem>
-                    <SelectItem value="B">B</SelectItem>
-                    <SelectItem value="C">C</SelectItem>
-                    <SelectItem value="D">D</SelectItem>
-                    <SelectItem value="E">E</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            {/* Linha 5: CNH removida */}
 
             <Separator />
 

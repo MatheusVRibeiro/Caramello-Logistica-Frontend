@@ -18,13 +18,13 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
         {/* Content */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="h-12 w-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Truck className="h-6 w-6 text-white" />
+          <div className="flex items-center gap-4 mb-8">
+            <div className="h-24 w-24 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center overflow-hidden">
+              <img src="/principal.png" alt="Caramello" className="h-full w-full object-cover" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">RN Logística</h1>
-              <p className="text-white/80 text-sm">Gestão Inteligente de Fretes</p>
+              <h1 className="text-2xl font-bold text-white">Caramello Logistica</h1>
+              <p className="text-white/80 text-sm">Movendo o agronegócio</p>
             </div>
           </div>
 
@@ -58,7 +58,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
 
         {/* Footer */}
         <p className="relative z-10 text-white/60 text-sm mt-8">
-          © 2026 RN Logística. Todos os direitos reservados.
+          © 2026 Caramello Logistica. Todos os direitos reservados.
         </p>
       </div>
 
@@ -67,11 +67,11 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-12 animate-fade-in">
-            <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-br from-primary to-primary/70 shadow-lg mb-4">
-              <Truck className="h-8 w-8 text-primary-foreground" />
+            <div className="inline-flex items-center justify-center h-24 w-24 rounded-2xl bg-gradient-to-br from-primary to-primary/70 shadow-lg mb-4 overflow-hidden">
+              <img src="/principal.png" alt="Caramello" className="h-full w-full object-cover" />
             </div>
-            <h1 className="text-3xl font-bold text-foreground">RN Logística</h1>
-            <p className="text-muted-foreground text-sm mt-2 font-medium">Gestão Inteligente de Fretes</p>
+            <h1 className="text-3xl font-bold text-foreground">Caramello Logistica</h1>
+            <p className="text-muted-foreground text-sm mt-2 font-medium">Movendo o agronegócio</p>
           </div>
 
           {/* Form Card */}

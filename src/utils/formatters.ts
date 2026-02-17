@@ -1,6 +1,18 @@
+/**
+ * Converte string ou número para número, retorna 0 se inválido
+ */
+export const toNumber = (valor: any): number => {
+  if (typeof valor === "number") return valor;
+  if (typeof valor === "string") {
+    const num = Number(valor.replace(/[^\d.,-]/g, '').replace(',', '.'));
+    return isNaN(num) ? 0 : num;
+  }
+  return 0;
+};
 // --- FORMATAÇÕES ---
 
 export const formatarCPF = (valor: string): string => {
+  if (!valor) return '';
   const limpo = valor.replace(/\D/g, '');
   return limpo
     .replace(/(\d{3})(\d)/, '$1.$2')

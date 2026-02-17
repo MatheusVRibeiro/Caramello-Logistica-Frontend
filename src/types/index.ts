@@ -12,7 +12,7 @@ export interface Caminhao {
   placa: string;
   placa_carreta?: string | null;
   modelo: string;
-  ano_fabricacao: number;
+  ano_fabricacao: number | string;
   status: "disponivel" | "em_viagem" | "em_manutencao" | "inativo";
   motorista_fixo_id?: string | null;
   capacidade_toneladas: number;
@@ -24,7 +24,7 @@ export interface Caminhao {
   registro_antt?: string | null;
   validade_seguro?: string | null;
   validade_licenciamento?: string | null;
-  proprietario_tipo: "PROPRIO" | "TERCEIRIZADO";
+  proprietario_tipo: "PROPRIO" | "TERCEIRO" | "AGREGADO";
   ultima_manutencao_data?: string | null;
   proxima_manutencao_km?: number | null;
   created_at?: string;
@@ -36,7 +36,7 @@ export interface CriarCaminhaoPayload {
   placa: string;
   placa_carreta?: string;
   modelo: string;
-  ano_fabricacao: number;
+  ano_fabricacao: number | string;
   capacidade_toneladas: number;
   tipo_veiculo: "BITREM" | "CARRETA" | "TRUCK" | "TOCO";
   status?: "disponivel" | "em_viagem" | "em_manutencao" | "inativo";
@@ -48,12 +48,13 @@ export interface CriarCaminhaoPayload {
   registro_antt?: string;
   validade_seguro?: string;
   validade_licenciamento?: string;
-  proprietario_tipo?: "PROPRIO" | "TERCEIRIZADO";
+  proprietario_tipo?: "PROPRIO" | "TERCEIRO" | "AGREGADO";
   ultima_manutencao_data?: string;
   proxima_manutencao_km?: number;
 }
 
 export interface Motorista {
+    codigo_motorista: string;
   id: string;
   nome: string;
   cpf: string;
@@ -63,7 +64,7 @@ export interface Motorista {
   cnh_validade: string;
   cnh_categoria?: "A" | "B" | "C" | "D" | "E";
   status: "ativo" | "inativo" | "ferias";
-  tipo: "proprio" | "terceirizado";
+  tipo: "proprio" | "terceirizado" | "agregado";
   receita_gerada: number;
   viagens_realizadas: number;
   // data_admissao removido
@@ -73,12 +74,12 @@ export interface Motorista {
   veiculo_id?: string | null;
   // Dados Bancários
   tipo_pagamento?: "pix" | "transferencia_bancaria";
-  chave_pix_tipo?: "cpf" | "email" | "telefone" | "aleatoria";
+  chave_pix_tipo?: "cpf" | "email" | "telefone" | "aleatoria" | "cnpj";
   chave_pix?: string;
   banco?: string;
   agencia?: string;
   conta?: string;
-  tipo_conta?: "corrente" | "poupanca";
+  tipo_conta?: "corrente" | "poupanca" | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -106,6 +107,7 @@ export interface Frete {
   custos: number;
   resultado: number;
   pagamento_id?: string | null;
+  ticket?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -130,6 +132,7 @@ export interface CriarFretePayload {
   receita?: number;
   custos?: number;
   resultado?: number;
+  ticket?: string;
   pagamento_id?: string;
 }
 
@@ -143,6 +146,7 @@ export interface ApiResponse<T = any> {
 
 export interface Fazenda {
   id: string;
+  codigo_fazenda: string;
   fazenda: string;
   localizacao?: string | null;
   proprietario?: string | null;

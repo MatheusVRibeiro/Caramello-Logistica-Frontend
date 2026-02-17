@@ -47,7 +47,7 @@ INSERT INTO usuarios (
 ) VALUES (
   'USR-001',
   'Matheus Ribeiro',
-  'admin@rnlogistica.com',
+  'admin@caramello.com',
   '$2a$10$N9qo8uLOickgx2ZMRZoMye1J5fQZHEKhQ7M5f9mNvTLtCkMLr6j.K',
   'admin',
   TRUE,

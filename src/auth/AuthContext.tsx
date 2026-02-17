@@ -29,21 +29,21 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       role: "admin",
     },
   },
-  "admin@rnlogistica.com": {
+  "admin@caramello.com": {
     password: "admin123",
     user: {
       id: "1",
       name: "Administrador",
-      email: "admin@rnlogistica.com",
+      email: "admin@caramello.com",
       role: "admin",
     },
   },
-  "operador@rnlogistica.com": {
+  "operador@caramello.com": {
     password: "operador123",
     user: {
       id: "2",
       name: "Operador",
-      email: "operador@rnlogistica.com",
+      email: "operador@caramello.com",
       role: "operador",
     },
   },
@@ -55,13 +55,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check for stored session on mount
-    const storedUser = localStorage.getItem("rn_logistica_user");
+    const storedUser = localStorage.getItem("caramello_logistica_user");
     
     if (storedUser) {
       try {
         setUser(JSON.parse(storedUser));
       } catch {
-        localStorage.removeItem("rn_logistica_user");
+        localStorage.removeItem("caramello_logistica_user");
       }
     }
     setIsLoading(false);
@@ -78,8 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { user, token } = res.data;
         
         setUser(user);
-        localStorage.setItem("rn_logistica_user", JSON.stringify(user));
-        if (token) localStorage.setItem("@RNLogistica:token", token);
+        localStorage.setItem("caramello_logistica_user", JSON.stringify(user));
+        if (token) localStorage.setItem("@CaramelloLogistica:token", token);
         
         setIsLoading(false);
         return true;
@@ -94,9 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (demoUser && demoUser.password === password) {
       setUser(demoUser.user);
-      localStorage.setItem("rn_logistica_user", JSON.stringify(demoUser.user));
+      localStorage.setItem("caramello_logistica_user", JSON.stringify(demoUser.user));
       // Clear any stored token when using demo
-      localStorage.removeItem("@RNLogistica:token");
+      localStorage.removeItem("@CaramelloLogistica:token");
       setIsLoading(false);
       return true;
     }
@@ -107,8 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("rn_logistica_user");
-    localStorage.removeItem("@RNLogistica:token");
+    localStorage.removeItem("caramello_logistica_user");
+    localStorage.removeItem("@CaramelloLogistica:token");
     window.location.href = "/login";
   };
 

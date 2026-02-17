@@ -62,9 +62,9 @@ Este projeto foi construido com:
 
 ## Como posso fazer o deploy deste projeto?
 
-Basta abrir o RN Logistica e clicar em Share -> Publish.
+Basta abrir o Caramello Logistica e clicar em Share -> Publish.
 
-## Posso conectar um dominio personalizado ao meu projeto RN Logistica?
+## Posso conectar um dominio personalizado ao meu projeto Caramello Logistica?
 
 Sim, voce pode!
 

@@ -167,13 +167,17 @@ export default function Custos() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [showAllCombustivel, setShowAllCombustivel] = useState(false);
+  const [showAllManutencao, setShowAllManutencao] = useState(false);
+  const [showAllPedagio, setShowAllPedagio] = useState(false);
+  const [showAllOutros, setShowAllOutros] = useState(false);
 
   // Estados do formulário
   const [formData, setFormData] = useState<Partial<CriarCustoPayload>>({
     frete_id: "",
     tipo: undefined,
     descricao: "",
-    valor: 0,
+    valor: undefined,
     data: "",
     comprovante: false,
     observacoes: "",
@@ -192,8 +196,8 @@ export default function Custos() {
       frete_id: "",
       tipo: undefined,
       descricao: "",
-      valor: 0,
-      data: "",
+      valor: undefined,
+      data: format(new Date(), "yyyy-MM-dd"),
       comprovante: false,
       observacoes: "",
       litros: undefined,
@@ -284,6 +288,57 @@ export default function Custos() {
     return Number.isNaN(parsed) ? 0 : parsed;
   };
 
+  const formatCurrency = (v: number | string | undefined) => {
+    if (v === undefined || v === null || v === "") return "";
+    const num = typeof v === "number" ? v : Number(v);
+    if (Number.isNaN(num)) return "";
+    return `R$ ${num.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const parseCurrency = (s: string) => {
+    if (!s) return undefined;
+    // Remove any currency symbol and spaces, keep digits, comma, dot and minus
+    let t = s.replace(/[^0-9,\.-]/g, "").trim();
+    if (!t) return undefined;
+    // Remove thousand separators (.) and replace decimal comma with dot
+    // If string contains both '.' and ',', assume '.' is thousand sep and ',' decimal
+    if (t.indexOf(",") > -1 && t.indexOf(".") > -1) {
+      t = t.replace(/\./g, "").replace(/,/g, ".");
+    } else {
+      // If only commas present, treat comma as decimal separator
+      if (t.indexOf(",") > -1 && t.indexOf(".") === -1) {
+        t = t.replace(/,/g, ".");
+      } else {
+        // Only dots or only digits -> remove dots (they may be thousand seps)
+        t = t.replace(/\./g, "");
+      }
+    }
+    const n = Number(t);
+    return Number.isNaN(n) ? undefined : n;
+  };
+
+  // Normalize strings (remove accents) to compare types robustly
+  const normalizeString = (s: any) => {
+    if (!s && s !== 0) return "";
+    const str = String(s).toLowerCase();
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  };
+
+  const getTipoKey = (tipo: any) => {
+    const n = normalizeString(tipo);
+    if (n.includes("combust")) return "combustivel";
+    if (n.includes("manutenc")) return "manutencao";
+    if (n.includes("pedag") || n.includes("pedagio") || n.includes("pedagios")) return "pedagio";
+    return "outros";
+  };
+
+  // Input helper for valor to allow formatted typing
+  const [valorInput, setValorInput] = useState<string>("");
+
+  useEffect(() => {
+    setValorInput(formatCurrency(formData.valor));
+  }, [formData.valor]);
+
   // Limpar todos os filtros
   const clearFilters = () => {
     setSearch("");
@@ -308,10 +363,11 @@ export default function Custos() {
 
   const filteredData = custosFiltrados.filter((custo) => {
     // Filtro de busca
+    const q = search.toLowerCase();
     const matchesSearch =
-      custo.frete_id.toLowerCase().includes(search.toLowerCase()) ||
-      custo.descricao.toLowerCase().includes(search.toLowerCase()) ||
-      custo.motorista.toLowerCase().includes(search.toLowerCase());
+      String(custo.frete_id || "").toLowerCase().includes(q) ||
+      String(custo.descricao || "").toLowerCase().includes(q) ||
+      String(custo.motorista || "").toLowerCase().includes(q);
     
     // Filtro de tipo
     const matchesTipo = tipoFilter === "all" || custo.tipo === tipoFilter;
@@ -340,6 +396,12 @@ export default function Custos() {
     return matchesSearch && matchesTipo && matchesMotorista && matchesComprovante && matchesDate;
   });
 
+  // Categorize items for separate cards (robust to accents/variants)
+  const combustivelItems = filteredData.filter((c) => getTipoKey(c.tipo) === "combustivel");
+  const manutencaoItems = filteredData.filter((c) => getTipoKey(c.tipo) === "manutencao");
+  const pedagioItems = filteredData.filter((c) => getTipoKey(c.tipo) === "pedagio");
+  const outrosItems = filteredData.filter((c) => getTipoKey(c.tipo) === "outros");
+
   // Lógica de paginação
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -351,22 +413,17 @@ export default function Custos() {
   }, [search, tipoFilter, motoristaFilter, comprovanteFilter, dateFrom, dateTo]);
 
   const totalCustos = custosFiltrados.reduce((acc, c) => acc + toNumber(c.valor), 0);
-  const totalCombustivel = custosFiltrados
-    .filter((c) => c.tipo === "combustivel")
-    .reduce((acc, c) => acc + toNumber(c.valor), 0);
-  const totalManutencao = custosFiltrados
-    .filter((c) => c.tipo === "manutencao")
-    .reduce((acc, c) => acc + toNumber(c.valor), 0);
-  const totalPedagio = custosFiltrados
-    .filter((c) => c.tipo === "pedagio")
-    .reduce((acc, c) => acc + toNumber(c.valor), 0);
+  const totalCombustivel = combustivelItems.reduce((acc, c) => acc + toNumber(c.valor), 0);
+  const totalManutencao = manutencaoItems.reduce((acc, c) => acc + toNumber(c.valor), 0);
+  const totalPedagio = pedagioItems.reduce((acc, c) => acc + toNumber(c.valor), 0);
 
   const columns = [
     {
       key: "tipo",
       header: "Tipo",
       render: (item: Custo) => {
-        const config = tipoConfig[item.tipo];
+        const tipoKey = getTipoKey(item.tipo);
+        const config = tipoConfig[tipoKey] || tipoConfig.outros;
         const Icon = config.icon;
         return (
           <div className="flex items-center gap-2">
@@ -381,9 +438,19 @@ export default function Custos() {
     {
       key: "frete_id",
       header: "Frete",
-      render: (item: Custo) => (
-        <span className="font-mono font-bold text-primary">{item.frete_id}</span>
-      ),
+      render: (item: Custo) => {
+        const related = fretes.find(f => String(f.id) === String(item.frete_id) || String(f.id) === String(item.frete_id));
+        const displayId = related ? related.id : item.frete_id;
+        const driver = item.motorista || (related ? related.motorista_nome || "" : "");
+        return (
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono font-bold text-primary">{displayId}</span>
+            </div>
+            {driver && <p className="text-xs text-muted-foreground mt-0.5">{driver}</p>}
+          </div>
+        );
+      },
     },
     { 
       key: "descricao", 
@@ -758,7 +825,7 @@ export default function Custos() {
       {/* Separação por Categoria */}
       <div className="space-y-6">
         {/* Combustível */}
-        {filteredData.filter(c => c.tipo === "combustivel").length > 0 && (
+        {combustivelItems.length > 0 && (
           <Card className="overflow-hidden">
             <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/10 border-b border-amber-300 dark:border-amber-800 px-3 py-2">
               <div className="flex items-center justify-between">
@@ -769,25 +836,33 @@ export default function Custos() {
                   <div>
                     <h3 className="font-semibold text-base">Combustível</h3>
                     <p className="text-xs text-muted-foreground">
-                      {filteredData.filter(c => c.tipo === "combustivel").length} lançamento{filteredData.filter(c => c.tipo === "combustivel").length > 1 ? 's' : ''}
+                      {combustivelItems.length} lançamento{combustivelItems.length > 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
-                    R$ {filteredData
-                      .filter(c => c.tipo === "combustivel")
-                      .reduce((acc, c) => acc + toNumber(c.valor), 0)
-                      .toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {totalCombustivel.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
             </div>
             <DataTable<Custo>
               columns={columns}
-              data={paginatedData.filter(c => c.tipo === "combustivel")}
+              data={ (showAllCombustivel ? combustivelItems : combustivelItems.slice(0,7)) }
+              onRowClick={handleRowClick}
+              emptyMessage="Nenhum custo de combustível"
             />
+
+            {/* Show all toggle */}
+            {combustivelItems.length > 7 && (
+              <div className="p-3 border-t flex justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setShowAllCombustivel((s) => !s)}>
+                  {showAllCombustivel ? `Ver menos` : `Ver todos (${combustivelItems.length})`}
+                </Button>
+              </div>
+            )}
 
             {/* Pagination */}
             {totalPages > 1 && (
@@ -890,17 +965,91 @@ export default function Custos() {
                   </div>
                 </>
               )}
-            <DataTable<Custo>
-              columns={columns}
-              data={paginatedData.filter(c => c.tipo === "manutencao")}
-              onRowClick={handleRowClick}
-              emptyMessage="Nenhum custo de manutenção"
-            />
           </Card>
         )}
 
-        {/* Outros */}
-        {filteredData.filter(c => c.tipo === "outros").length > 0 && (
+        {/* Manutenção */}
+        {manutencaoItems.length > 0 && (
+          <Card className="overflow-hidden">
+            <div className="bg-gradient-to-r from-red-50/20 to-red-100/10 border-b border-red-200 px-3 py-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-red-100">
+                    <Wrench className="h-4 w-4 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-base">Manutenção</h3>
+                    <p className="text-xs text-muted-foreground">
+                      {manutencaoItems.length} lançamento{manutencaoItems.length > 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="text-lg font-bold text-red-600">
+                    R$ {manutencaoItems.reduce((acc, c) => acc + toNumber(c.valor), 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+            </div>
+            <DataTable<Custo>
+              columns={columns}
+              data={ (showAllManutencao ? manutencaoItems : manutencaoItems.slice(0,7)) }
+              onRowClick={handleRowClick}
+              emptyMessage="Nenhum custo de manutenção"
+            />
+            {manutencaoItems.length > 7 && (
+              <div className="p-3 border-t flex justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setShowAllManutencao((s) => !s)}>
+                  {showAllManutencao ? `Ver menos` : `Ver todos (${manutencaoItems.length})`}
+                </Button>
+              </div>
+            )}
+          </Card>
+        )}
+
+            {/* Pedágios */}
+            {pedagioItems.length > 0 && (
+              <Card className="overflow-hidden">
+                <div className="bg-gradient-to-r from-sky-50/20 to-sky-100/10 border-b border-sky-200 px-3 py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-sky-100">
+                        <Truck className="h-4 w-4 text-sky-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-base">Pedágios</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {pedagioItems.length} lançamento{pedagioItems.length > 1 ? 's' : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className="text-lg font-bold text-sky-600">
+                        R$ {pedagioItems.reduce((acc, c) => acc + toNumber(c.valor), 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <DataTable<Custo>
+                  columns={columns}
+                  data={ (showAllPedagio ? pedagioItems : pedagioItems.slice(0,7)) }
+                  onRowClick={handleRowClick}
+                  emptyMessage="Nenhum pedágio"
+                />
+                {pedagioItems.length > 7 && (
+                  <div className="p-3 border-t flex justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => setShowAllPedagio((s) => !s)}>
+                      {showAllPedagio ? `Ver menos` : `Ver todos (${pedagioItems.length})`}
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* Outros */}
+        {outrosItems.length > 0 && (
           <Card className="overflow-hidden">
             <div className="bg-gradient-to-r from-slate-500/20 to-gray-500/10 border-b border-slate-300 dark:border-slate-800 px-3 py-2">
               <div className="flex items-center justify-between">
@@ -911,27 +1060,31 @@ export default function Custos() {
                   <div>
                     <h3 className="font-semibold text-base">Outros</h3>
                     <p className="text-xs text-muted-foreground">
-                      {filteredData.filter(c => c.tipo === "outros").length} lançamento{filteredData.filter(c => c.tipo === "outros").length > 1 ? 's' : ''}
+                      {outrosItems.length} lançamento{outrosItems.length > 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Total</p>
                   <p className="text-lg font-bold text-slate-600 dark:text-slate-400">
-                    R$ {filteredData
-                      .filter(c => c.tipo === "outros")
-                      .reduce((acc, c) => acc + toNumber(c.valor), 0)
-                      .toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {outrosItems.reduce((acc, c) => acc + toNumber(c.valor), 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
               </div>
             </div>
             <DataTable<Custo>
               columns={columns}
-              data={paginatedData.filter(c => c.tipo === "outros")}
+              data={ (showAllOutros ? outrosItems : outrosItems.slice(0,7)) }
               onRowClick={handleRowClick}
               emptyMessage="Nenhum outro custo"
             />
+            {outrosItems.length > 7 && (
+              <div className="p-3 border-t flex justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setShowAllOutros((s) => !s)}>
+                  {showAllOutros ? `Ver menos` : `Ver todos (${outrosItems.length})`}
+                </Button>
+              </div>
+            )}
           </Card>
         )}
 
@@ -1324,21 +1477,58 @@ export default function Custos() {
                 <Label htmlFor="valor">Valor *</Label>
                 <Input
                   id="valor"
-                  type="number"
-                  placeholder="0,00"
-                  step="0.01"
-                  value={formData.valor ?? 0}
-                  onChange={(e) => setFormData({ ...formData, valor: Number(e.target.value) })}
+                  placeholder="R$ 0,00"
+                  value={valorInput}
+                  onChange={(e) => {
+                    // digit-based mask: keep only digits
+                    const digits = (e.target.value || "").replace(/\D/g, "");
+                    if (!digits) {
+                      setValorInput("");
+                      setFormData({ ...formData, valor: undefined });
+                      return;
+                    }
+                    // interpret last two digits as cents
+                    const cents = parseInt(digits, 10);
+                    const reais = cents / 100;
+                    setFormData({ ...formData, valor: reais });
+                    setValorInput(formatCurrency(reais));
+                  }}
+                  onBlur={() => {
+                    // ensure formatted
+                    setValorInput(formatCurrency(formData.valor));
+                  }}
+                  onFocus={() => {
+                    // when focusing, show digits only for easier editing
+                    if (formData.valor !== undefined && formData.valor !== null) {
+                      // show numeric without currency formatting, using cents as integer
+                      const cents = Math.round(Number(formData.valor) * 100);
+                      setValorInput(String(cents));
+                    } else {
+                      setValorInput("");
+                    }
+                  }}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="data">Data *</Label>
-                <Input
-                  id="data"
-                  type="date"
-                  value={formData.data || ""}
-                  onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-                />
+                <Label className="">Data *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className={cn("w-full justify-start text-left font-normal", !formData.data && "text-muted-foreground") }>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.data ? format(parseCustoDate(formData.data) ?? new Date(), "dd/MM/yyyy") : "Selecione"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <div className="p-3">
+                      <Calendar
+                        mode="single"
+                        selected={parseCustoDate(formData.data)}
+                        onSelect={(d) => setFormData({ ...formData, data: d ? format(d, "yyyy-MM-dd") : "" })}
+                        className="pointer-events-auto"
+                      />
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div className="space-y-2">

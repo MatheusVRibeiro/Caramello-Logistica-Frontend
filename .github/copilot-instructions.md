@@ -1,4 +1,4 @@
-# Copilot Instructions - RN Logística Fretes Inteligentes
+# Copilot Instructions - Caramello Logistica Fretes Inteligentes
 
 ## Visão Geral do Projeto
 Sistema de gestão de logística e fretes para TCC, desenvolvido com React + TypeScript + Vite. Foco em gerenciamento de fretes, caminhões, motoristas, mercadorias, custos e indicadores operacionais.
@@ -20,8 +20,8 @@ Todas as rotas (exceto `/login`) são protegidas por `ProtectedRoute`. Ver `src/
 
 ### Sistema de Autenticação
 - Contexto: `src/auth/AuthContext.tsx`
-- Demo users hardcoded (admin@rnlogistica.com / operador@rnlogistica.com)
-- Sessão persistida via `localStorage` com chave `rn_logistica_user`
+- Demo users hardcoded (admin@caramello.com / operador@caramello.com)
+- Sessão persistida via `localStorage` com chave `caramello_logistica_user`
 - Roles definidas: `admin`, `operador`, `motorista`
 - **Permissões**: Foco atual apenas em `admin` (gestor) - outras roles reservadas para expansão futura
 

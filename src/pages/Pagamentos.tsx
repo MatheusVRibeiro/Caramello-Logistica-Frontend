@@ -263,6 +263,24 @@ export default function Pagamentos() {
     [motoristasApi]
   );
 
+  // Motoristas que possuem fretes pendentes (pagamento_id == null)
+  const motoristasComPendentes = useMemo(() => {
+    const pendingIds = new Set((fretesApi || []).filter(f => f.pagamento_id == null).map(f => f.motorista_id));
+    return motoristasApi
+      .filter((m) => pendingIds.has(m.id))
+      .map((motorista) => ({
+        id: motorista.id,
+        nome: motorista.nome,
+        tipoPagamento: motorista.tipo_pagamento || "pix",
+        chavePixTipo: motorista.chave_pix_tipo,
+        chavePix: motorista.chave_pix,
+        banco: motorista.banco,
+        agencia: motorista.agencia,
+        conta: motorista.conta,
+        tipoConta: motorista.tipo_conta,
+      }));
+  }, [motoristasApi, fretesApi]);
+
   const fretesData = useMemo(
     () =>
       fretesApi.map((frete) => ({
@@ -275,6 +293,31 @@ export default function Pagamentos() {
         pagamentoId: frete.pagamento_id ?? null,
       })),
     [fretesApi]
+  );
+
+  // Query pendentes por motorista (carrega apenas fretes com pagamento_id == null)
+  const motoristaIdForPendentes = editedPagamento?.motoristaId || null;
+  const {
+    data: fretesPendentesResponse,
+    isLoading: isLoadingFretesPendentes,
+  } = useQuery<ApiResponse<Frete[]>>({
+    queryKey: ["fretes", "pendentes", motoristaIdForPendentes],
+    queryFn: () => fretesService.listarFretesPendentes(String(motoristaIdForPendentes)),
+    enabled: !!motoristaIdForPendentes,
+    retry: 1,
+  });
+
+  const fretesPendentesData = useMemo(
+    () => (fretesPendentesResponse?.data || []).map((frete) => ({
+      id: frete.id,
+      motoristaId: frete.motorista_id,
+      dataFrete: formatDateBR(frete.data_frete),
+      rota: `${frete.origem} → ${frete.destino}`,
+      toneladas: Number(frete.toneladas) || 0,
+      valorGerado: Number(frete.receita ?? frete.toneladas * frete.valor_por_tonelada) || 0,
+      pagamentoId: frete.pagamento_id ?? null,
+    })),
+    [fretesPendentesResponse]
   );
 
   const pagamentosData = useMemo(
@@ -321,14 +364,28 @@ export default function Pagamentos() {
     onSuccess: (response) => {
       if (response.success) {
         queryClient.invalidateQueries({ queryKey: ["pagamentos"] });
+        // refresh fretes pendentes for current motorista and full fretes list
+        if (motoristaIdForPendentes) {
+          queryClient.invalidateQueries({ queryKey: ["fretes", "pendentes", motoristaIdForPendentes] });
+        }
+        queryClient.invalidateQueries({ queryKey: ["fretes"] });
         toast.success("Pagamento registrado com sucesso!");
         setIsModalOpen(false);
+        setSelectedFretes([]);
       } else {
         toast.error(response.message || "Erro ao criar pagamento");
       }
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Erro ao criar pagamento");
+      const isNetwork = !error?.response;
+      const msg = isNetwork ? "Erro de rede, tente novamente" : (error?.response?.data?.message || error?.message || "Erro ao criar pagamento");
+      toast.error(msg);
+      // If backend indicates some fretes already paid, refresh pending list to sync UI
+      if (String(msg).toLowerCase().includes("alguns fretes ja") || String(msg).toLowerCase().includes("alguns fretes já") || String(msg).toLowerCase().includes("já estão pagos")) {
+        if (motoristaIdForPendentes) {
+          queryClient.invalidateQueries({ queryKey: ["fretes", "pendentes", motoristaIdForPendentes] });
+        }
+      }
     },
   });
 
@@ -338,6 +395,10 @@ export default function Pagamentos() {
     onSuccess: (response) => {
       if (response.success) {
         queryClient.invalidateQueries({ queryKey: ["pagamentos"] });
+        if (motoristaIdForPendentes) {
+          queryClient.invalidateQueries({ queryKey: ["fretes", "pendentes", motoristaIdForPendentes] });
+        }
+        queryClient.invalidateQueries({ queryKey: ["fretes"] });
         toast.success("Pagamento atualizado com sucesso!");
         setIsModalOpen(false);
       } else {
@@ -345,7 +406,14 @@ export default function Pagamentos() {
       }
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Erro ao atualizar pagamento");
+      const isNetwork = !error?.response;
+      const msg = isNetwork ? "Erro de rede, tente novamente" : (error?.response?.data?.message || error?.message || "Erro ao atualizar pagamento");
+      toast.error(msg);
+      if (String(msg).toLowerCase().includes("alguns fretes ja") || String(msg).toLowerCase().includes("alguns fretes já") || String(msg).toLowerCase().includes("já estão pagos")) {
+        if (motoristaIdForPendentes) {
+          queryClient.invalidateQueries({ queryKey: ["fretes", "pendentes", motoristaIdForPendentes] });
+        }
+      }
     },
   });
 
@@ -378,6 +446,22 @@ export default function Pagamentos() {
   };
 
   const handleMotoristaChange = (motoristaId: string) => {
+    // Handle clearing selection (placeholder uses 'none')
+    if (motoristaId === "none" || motoristaId === "") {
+      setSelectedFretes([]);
+      setEditedPagamento({
+        ...editedPagamento,
+        motoristaId: "",
+        motoristaNome: "",
+        toneladas: 0,
+        fretes: 0,
+        valorTotal: 0,
+        fretesSelecionados: [],
+        metodoPagamento: "pix",
+      });
+      return;
+    }
+
     const motorista = motoristas.find((m) => m.id === motoristaId);
     setSelectedFretes([]);
     setEditedPagamento({
@@ -394,13 +478,27 @@ export default function Pagamentos() {
 
   // Buscar fretes não pagos do motorista selecionado
   const fretesNaoPagos = useMemo(() => {
-    if (!editedPagamento.motoristaId) return [];
+    // prefer pendentes endpoint result; fallback to full list filter
+    if (!editedPagamento?.motoristaId) return [];
+    if (fretesPendentesData && fretesPendentesData.length > 0) {
+      return fretesPendentesData;
+    }
     return fretesData.filter(
       (f) => f.motoristaId === editedPagamento.motoristaId && f.pagamentoId === null
     );
-  }, [editedPagamento.motoristaId]);
+  }, [editedPagamento?.motoristaId, fretesPendentesData, fretesData]);
 
   const handleToggleFrete = (freteId: string) => {
+    // prefer pending fretes list, fallback to full fretesData
+    const frete = fretesPendentesData.find((f) => f.id === freteId) || fretesData.find((f) => f.id === freteId);
+    if (!frete) return;
+
+    // If frete is already linked to a payment different from current edited payment, block selection
+    if (frete.pagamentoId && frete.pagamentoId !== (editedPagamento?.id ?? null)) {
+      toast.error("Este frete já foi pago e não pode ser selecionado.");
+      return;
+    }
+
     const isSelected = selectedFretes.includes(freteId);
     const nextSelected = isSelected
       ? selectedFretes.filter((id) => id !== freteId)
@@ -463,6 +561,8 @@ export default function Pagamentos() {
   };
 
   const handleSave = () => {
+    // prevent double-submit
+    if (createMutation.status === "pending" || updateMutation.status === "pending") return;
     if (!editedPagamento.motoristaId) {
       toast.error("Selecione um motorista");
       return;
@@ -470,6 +570,22 @@ export default function Pagamentos() {
 
     if (selectedFretes.length === 0) {
       toast.error("Selecione pelo menos um frete para pagamento");
+      return;
+    }
+
+    // Validate that selected fretes are not already linked to another payment
+    const conflicting = selectedFretes.find((id) => {
+      const f = fretesData.find((ff) => ff.id === id);
+      if (!f) return false;
+      // allow if editing and the frete is linked to the same payment being edited
+      if (f.pagamentoId && isEditing && editedPagamento?.id && String(f.pagamentoId) === String(editedPagamento.id)) return false;
+      return !!f.pagamentoId;
+    });
+
+    if (conflicting) {
+      toast.error("Um ou mais fretes selecionados já estão vinculados a outro pagamento.");
+      // refresh pendentes to sync UI
+      if (motoristaIdForPendentes) queryClient.invalidateQueries({ queryKey: ["fretes", "pendentes", motoristaIdForPendentes] });
       return;
     }
 
@@ -1692,11 +1808,15 @@ export default function Pagamentos() {
                   <SelectValue placeholder="Selecione um motorista" />
                 </SelectTrigger>
                 <SelectContent className="max-h-64 overflow-y-auto">
-                  {motoristas.map((motorista) => (
-                    <SelectItem key={motorista.id} value={motorista.id}>
-                      {motorista.nome}
-                    </SelectItem>
-                  ))}
+                  {motoristasComPendentes.length === 0 ? (
+                    <SelectItem value="none" disabled>Nenhum motorista com pagamentos pendentes</SelectItem>
+                  ) : (
+                    motoristasComPendentes.map((motorista) => (
+                      <SelectItem key={motorista.id} value={motorista.id}>
+                        {motorista.nome}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -2130,7 +2250,7 @@ export default function Pagamentos() {
               <X className="h-4 w-4 mr-2" />
               Cancelar
             </Button>
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={createMutation.status === "pending" || updateMutation.status === "pending"}>
               <Save className="h-4 w-4 mr-2" />
               {isEditing ? "Salvar Alterações" : "Registrar Pagamento"}
             </Button>

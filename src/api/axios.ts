@@ -11,7 +11,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     try {
-      const token = localStorage.getItem("@RNLogistica:token");
+      const token = localStorage.getItem("@CaramelloLogistica:token");
       if (token && config.headers) {
         // eslint-disable-next-line no-param-reassign
         config.headers.Authorization = `Bearer ${token}`;

@@ -786,6 +786,141 @@ export default function Fazendas() {
               );
               })}
             </div>
+            {fazendasFinalizadas.length > 0 && (
+              <div className="mt-8">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Colheitas finalizadas</h3>
+                  <Badge className="bg-emerald-600 text-white">{fazendasFinalizadas.length} fazenda(s)</Badge>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                  {fazendasFinalizadas.map((fazenda) => {
+                    const precoPorSaca =
+                      (toNumber(fazenda.preco_por_tonelada) * toNumber(fazenda.peso_medio_saca)) / 1000;
+                    const hasProducao = toNumber(fazenda.total_sacas_carregadas) > 0;
+
+                    return (
+                      <Card
+                        key={fazenda.id}
+                        className="group hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden border-2 hover:border-primary/50"
+                        onClick={() => setSelectedProducao(fazenda)}
+                      >
+                        <CardHeader className="bg-gradient-to-br from-primary/5 via-primary/3 to-transparent pb-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-start gap-3">
+                              <Avatar className="h-12 w-12 border-2 border-background shadow-md">
+                                <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white font-bold text-lg">
+                                  {fazenda.fazenda.substring(0, 2).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="space-y-1">
+                                <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
+                                  {fazenda.fazenda}
+                                </CardTitle>
+                                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                  <MapPin className="h-3.5 w-3.5" />
+                                  {fazenda.localizacao}
+                                </div>
+                              </div>
+                            </div>
+                            {fazenda.colheita_finalizada ? (
+                              <Badge className="bg-emerald-600 text-white shadow-sm">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Finalizada
+                              </Badge>
+                            ) : (
+                              hasProducao && (
+                                <Badge variant="default" className="shadow-sm">
+                                  <BarChart3 className="h-3 w-3 mr-1" />
+                                  Ativa
+                                </Badge>
+                              )
+                            )}
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="pt-6 space-y-4">
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-2 text-sm">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-muted-foreground">Proprietário:</span>
+                              <span className="font-medium">{fazenda.proprietario}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Package className="h-4 w-4 text-blue-600" />
+                                <span className="font-semibold text-sm">{fazenda.mercadoria}</span>
+                              </div>
+                              <Badge variant="outline" className="text-xs">
+                                {fazenda.variedade}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          <Separator />
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Package className="h-3 w-3" />
+                                Sacas
+                              </p>
+                              <p className="text-2xl font-bold text-blue-600">
+                                {toNumber(fazenda.total_sacas_carregadas).toLocaleString("pt-BR")}
+                              </p>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Weight className="h-3 w-3" />
+                                Toneladas
+                              </p>
+                              <p className="text-2xl font-bold text-purple-600">
+                                {toNumber(fazenda.total_toneladas).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="p-3 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/10 rounded-lg border border-green-200/50 dark:border-green-800/50">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-medium text-green-700 dark:text-green-400 flex items-center gap-1">
+                                <DollarSign className="h-3 w-3" />
+                                Faturamento Total
+                              </span>
+                            </div>
+                            <p className="text-2xl font-bold text-green-600 dark:text-green-500">
+                              R$ {toNumber(fazenda.faturamento_total).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            </p>
+                            <div className="mt-2 pt-2 border-t border-green-200/50 dark:border-green-800/50 space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">Preço/ton:</span>
+                                <span className="font-semibold">R$ {toNumber(fazenda.preco_por_tonelada).toLocaleString("pt-BR")}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">Preço/saca:</span>
+                                <span className="font-semibold">R$ {precoPorSaca.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              Safra {fazenda.safra}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              Último frete: <span className="font-medium">
+                                {fazenda.ultimo_frete_data 
+                                  ? format(new Date(fazenda.ultimo_frete_data), "dd/MM/yyyy", { locale: ptBR })
+                                  : "Nunca"}
+                                </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {/* Pagination */}
             {totalPages > 1 && (
                             <>

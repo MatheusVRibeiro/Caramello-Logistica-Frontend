@@ -61,3 +61,19 @@ export async function obterFrete(id: string): Promise<ApiResponse<Frete>> {
     return { success: false, data: null, message };
   }
 }
+
+export async function listarFretesPendentes(motoristaId?: string): Promise<ApiResponse<Frete[]>> {
+  try {
+    const url = motoristaId ? `/fretes/pendentes?motorista_id=${motoristaId}` : "/fretes/pendentes";
+    const res = await api.get<BackendFretesResponse>(url);
+
+    if (res.data.success && res.data.data) {
+      return { success: true, data: res.data.data };
+    }
+
+    return { success: false, data: null, message: "Resposta inválida do servidor" };
+  } catch (err: any) {
+    const message = err?.response?.data?.message ?? err.message ?? "Erro ao listar fretes pendentes";
+    return { success: false, data: null, message };
+  }
+}

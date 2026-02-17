@@ -25,7 +25,7 @@ export default function Login() {
   const from = location.state?.from?.pathname || "/";
 
   useEffect(() => {
-    const savedEmail = localStorage.getItem("@RNLogistica:savedEmail");
+    const savedEmail = localStorage.getItem("@CaramelloLogistica:savedEmail");
     if (savedEmail) {
       setEmail(savedEmail);
       setRememberMe(true);
@@ -56,9 +56,9 @@ export default function Login() {
         duration: 3000,
       });
       if (rememberMe) {
-        localStorage.setItem("@RNLogistica:savedEmail", email);
+        localStorage.setItem("@CaramelloLogistica:savedEmail", email);
       } else {
-        localStorage.removeItem("@RNLogistica:savedEmail");
+        localStorage.removeItem("@CaramelloLogistica:savedEmail");
       }
       navigate(from, { replace: true });
     } else {
@@ -112,7 +112,7 @@ export default function Login() {
                 placeholder="seu@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-12 h-12 text-base rounded-lg border-2 transition-all focus:border-primary focus:ring-0"
+                className="pl-12 h-12 text-base rounded-lg transition-all focus:border-primary focus-visible:ring-0 focus-visible:ring-offset-0"
                 disabled={isSubmitting}
                 autoComplete="username"
                 required
@@ -134,7 +134,7 @@ export default function Login() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-12 pr-12 h-12 text-base rounded-lg border-2 transition-all focus:border-primary focus:ring-0"
+                className="pl-12 pr-12 h-12 text-base rounded-lg transition-all focus:border-primary focus-visible:ring-0 focus-visible:ring-offset-0"
                 disabled={isSubmitting}
                 autoComplete="current-password"
                 required

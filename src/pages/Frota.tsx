@@ -250,17 +250,30 @@ export default function Frota() {
       capacidadeNormalized = null;
     }
 
+    // Normalize fields to match backend schema precisely
+    const mapProprietarioTipo = (v?: string | undefined) => {
+      if (!v) return undefined;
+      // Backend expects: PROPRIO | TERCEIRO | AGREGADO
+      if (v === "TERCEIRIZADO") return "TERCEIRO";
+      if (v === "PROPRIO") return "PROPRIO";
+      if (v === "AGREGADO") return "AGREGADO";
+      return v;
+    };
+
     const payload: CriarCaminhaoPayload = {
       placa: placaNorm as string,
-      modelo: editedCaminhao.modelo as string,
-      ano_fabricacao: editedCaminhao.ano_fabricacao as number,
+      modelo: String(editedCaminhao.modelo || ""),
+      // Some backends expect year as string — ensure consistent typing
+      ano_fabricacao: typeof editedCaminhao.ano_fabricacao === 'number' ? String(editedCaminhao.ano_fabricacao) as any : (editedCaminhao.ano_fabricacao as any),
       capacidade_toneladas: capacidadeNormalized as number,
       tipo_veiculo: editedCaminhao.tipo_veiculo as any,
       status: editedCaminhao.status || "disponivel",
       km_atual: editedCaminhao.km_atual || 0,
       tipo_combustivel: editedCaminhao.tipo_combustivel,
-      motorista_fixo_id: editedCaminhao.motorista_fixo_id || undefined,
-      proprietario_tipo: editedCaminhao.proprietario_tipo,
+      motorista_fixo_id: editedCaminhao.motorista_fixo_id
+        ? String(editedCaminhao.motorista_fixo_id)
+        : null,
+      proprietario_tipo: mapProprietarioTipo(editedCaminhao.proprietario_tipo as any) as any,
       renavam: editedCaminhao.renavam || undefined,
       chassi: editedCaminhao.chassi || undefined,
       registro_antt: editedCaminhao.registro_antt || undefined,
@@ -1414,7 +1427,7 @@ export default function Frota() {
                   </Label>
                   <Select
                     value={editedCaminhao.proprietario_tipo || "PROPRIO"}
-                    onValueChange={(value: "PROPRIO" | "TERCEIRIZADO") => 
+                    onValueChange={(value: "PROPRIO" | "TERCEIRO" | "AGREGADO") => 
                       setEditedCaminhao({ ...editedCaminhao, proprietario_tipo: value })
                     }
                   >
@@ -1423,7 +1436,8 @@ export default function Frota() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="PROPRIO">Próprio</SelectItem>
-                      <SelectItem value="TERCEIRIZADO">Terceirizado</SelectItem>
+                      <SelectItem value="TERCEIRO">Terceiro</SelectItem>
+                      <SelectItem value="AGREGADO">Agregado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
