@@ -1332,7 +1332,7 @@ export default function Pagamentos() {
                     <SelectItem value="all">Todos</SelectItem>
                     {motoristas.map((motorista) => (
                       <SelectItem key={motorista.id} value={motorista.id}>
-                        {motorista.nome}
+                        {shortName(motorista.nome)}
                       </SelectItem>
                     ))}
                   </SelectContent>

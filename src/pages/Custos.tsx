@@ -51,7 +51,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Plus, Upload, Fuel, Wrench, FileText, DollarSign, Truck, User, MapPin, Calendar as CalendarIcon, FileCheck, Eye, Filter, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, shortName } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
@@ -460,7 +460,7 @@ export default function Custos() {
             <div className="flex items-center gap-2">
               <span className="font-mono font-bold text-primary">{displayId}</span>
             </div>
-            {driver && <p className="text-xs text-muted-foreground mt-0.5">{driver}</p>}
+            {driver && <p className="text-xs text-muted-foreground mt-0.5">{shortName(driver)}</p>}
           </div>
         );
       },
@@ -471,7 +471,7 @@ export default function Custos() {
       render: (item: Custo) => (
         <div>
           <p className="font-medium">{item.descricao}</p>
-          <p className="text-xs text-muted-foreground">{item.motorista}</p>
+          <p className="text-xs text-muted-foreground">{shortName(item.motorista)}</p>
         </div>
       ),
     },

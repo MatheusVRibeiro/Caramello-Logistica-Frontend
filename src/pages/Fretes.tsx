@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { shortName } from "@/lib/utils";
 import {
   Pagination,
   PaginationContent,
@@ -1101,7 +1102,7 @@ export default function Fretes() {
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm">
             <Truck className="h-4 w-4 text-blue-600 flex-shrink-0" />
-            <span className="font-medium text-foreground truncate">{item.motorista}</span>
+            <span className="font-medium text-foreground truncate">{shortName(item.motorista)}</span>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="px-2 py-1 bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 rounded font-mono">
