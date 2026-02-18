@@ -360,7 +360,9 @@ export default function Relatorios() {
         <span className="font-mono font-bold text-primary">{item.id}</span>
       ),
     },
-    { key: "motorista", header: "Motorista" },
+    { key: "motorista", header: "Motorista", render: (item: PagamentoRelatorio) => (
+      <span className="font-medium">{shortName(item.motorista)}</span>
+    ) },
     {
       key: "dataPagamento",
       header: "Data",

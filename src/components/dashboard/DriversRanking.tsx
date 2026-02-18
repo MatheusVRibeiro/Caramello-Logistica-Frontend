@@ -1,6 +1,7 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp } from "lucide-react";
+import { shortName } from "@/lib/utils";
 
 interface Driver {
   name: string;
@@ -50,7 +51,7 @@ export function DriversRanking({ drivers: propDrivers }: DriversRankingProps) {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-foreground truncate">{driver.name}</p>
+              <p className="font-medium text-foreground truncate">{shortName(driver.name)}</p>
               <p className="text-sm text-muted-foreground">{driver.trips} viagens</p>
             </div>
             <div className="text-right">

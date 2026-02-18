@@ -68,7 +68,7 @@ import {
 // Utilities
 import { format, parse } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, shortName } from "@/lib/utils";
 import { toast } from "sonner";
 import { ITEMS_PER_PAGE } from "@/lib/pagination";
 
@@ -1042,7 +1042,7 @@ export default function Pagamentos() {
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground">{item.motoristaNome}</p>
+            <p className="font-semibold text-foreground">{shortName(item.motoristaNome)}</p>
             <div className="flex items-center gap-1.5 mt-1">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
               <p className="text-xs text-muted-foreground font-medium">{item.dataFrete}</p>

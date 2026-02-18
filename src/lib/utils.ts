@@ -41,3 +41,11 @@ export function emptyToNull(obj: Record<string, any>, keys?: string[]) {
   }
   return out;
 }
+
+// Return first N name parts (default 2) from a full name. Keeps at most two words.
+export function shortName(fullName: string | undefined | null, parts = 2) {
+  if (!fullName) return "";
+  const p = String(fullName).trim().split(/\s+/).filter(Boolean);
+  if (p.length === 0) return "";
+  return p.slice(0, Math.min(parts, p.length)).join(" ");
+}
