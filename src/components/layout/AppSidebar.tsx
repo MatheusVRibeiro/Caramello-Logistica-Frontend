@@ -67,7 +67,7 @@ export function AppSidebar() {
       {/* Desktop Sidebar */}
       <aside
         className={cn(
-          "flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out",
+          "flex shrink-0 flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ease-in-out",
           "hidden lg:flex",
           collapsed ? "w-16" : "w-64"
         )}

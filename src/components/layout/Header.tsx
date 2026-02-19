@@ -29,7 +29,7 @@ export function Header({ title, subtitle }: HeaderProps) {
   };
 
   return (
-    <header className="h-14 sm:h-16 border-b border-border bg-card flex items-center justify-between px-4 sm:px-6 ml-12 lg:ml-0">
+    <header className="h-14 sm:h-16 border-b border-border bg-card flex items-center justify-between px-4 pl-16 sm:px-6 sm:pl-6">
       <div className="min-w-0 flex-1">
         <h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">{title}</h1>
         {subtitle && !isMobile && (

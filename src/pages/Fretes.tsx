@@ -1254,7 +1254,7 @@ export default function Fretes() {
         title="Fretes"
         description="Receita é o valor total do frete. Custos são adicionais (pedágios, diárias, etc.)"
         actions={
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden w-full lg:flex lg:flex-wrap lg:items-center lg:justify-end lg:gap-3">
             {/* Seletor de Tipo de Visualização */}
             <div className="flex items-center gap-2">
               <Label className="text-sm text-muted-foreground whitespace-nowrap">Visualizar:</Label>

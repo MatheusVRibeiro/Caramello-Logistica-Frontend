@@ -20,8 +20,8 @@ export function FilterBar({
   className,
 }: FilterBarProps) {
   return (
-    <div className={cn("flex flex-col sm:flex-row items-end gap-3 mb-6", className)}>
-      <div className="flex-1 max-w-sm">
+    <div className={cn("mb-6 flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end", className)}>
+      <div className="w-full flex-1 sm:min-w-[240px] sm:max-w-sm">
         <label className="text-xs text-muted-foreground block mb-1">Buscar</label>
         <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -123,7 +123,7 @@ export function DataTable<T>({
         />
       )}
 
-      <div className="space-y-3 md:hidden animate-fade-in">
+      <div className="space-y-3 lg:hidden animate-fade-in">
         {filteredData.map((item, index) => {
           const isNegative = highlightNegative?.(item);
           return (
@@ -165,14 +165,14 @@ export function DataTable<T>({
         })}
       </div>
 
-      <div className="hidden md:block bg-card rounded-xl border animate-fade-in shadow-sm">
+      <div className="hidden lg:block w-full min-w-0 bg-card rounded-xl border animate-fade-in shadow-sm">
         <div
           ref={containerRef}
-          className="w-full overflow-auto"
+          className="w-full max-w-full overflow-x-auto overflow-y-auto"
           style={virtualized ? { maxHeight: virtualizedHeight } : undefined}
           onScroll={(event) => setScrollTop((event.currentTarget as HTMLDivElement).scrollTop)}
         >
-          <Table>
+          <Table className="w-full min-w-[720px]">
             <TableHeader>
               <TableRow className="bg-gradient-to-r from-muted/50 to-muted/30 hover:bg-muted/50 border-b-2">
                 {columns.map((column) => (
