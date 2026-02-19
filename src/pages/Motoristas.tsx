@@ -52,6 +52,8 @@ import type { Motorista } from "@/types";
 import { ITEMS_PER_PAGE } from "@/lib/pagination";
 import { useCriarMotorista, useMotoristas, useAtualizarMotorista } from "@/hooks/queries/useMotoristas";
 import { ModalSubmitFooter } from "@/components/shared/ModalSubmitFooter";
+import { RefreshingIndicator } from "@/components/shared/RefreshingIndicator";
+import { useRefreshData } from "@/hooks/useRefreshData";
 
 // Payload para criar motorista
 interface CriarMotoristaPayload {
@@ -119,6 +121,7 @@ export default function Motoristas() {
   const createMotoristaMutation = useCriarMotorista();
   const atualizarMotoristaMutation = useAtualizarMotorista();
   const isSaving = createMotoristaMutation.status === "pending" || atualizarMotoristaMutation.status === "pending";
+  const { isRefreshing, startRefresh, endRefresh } = useRefreshData();
 
 
   // Abrir modal de edição quando rota /motoristas/editar/:id for acessada
@@ -309,6 +312,7 @@ export default function Motoristas() {
       }
 
       const id = String(editedMotorista.id || editedMotorista.codigo_motorista || "");
+      startRefresh();
       try {
         console.debug("atualizarMotorista - payload:", finalUpdatePayload);
         const res = await atualizarMotoristaMutation.mutateAsync({ id, payload: finalUpdatePayload });
@@ -322,28 +326,35 @@ export default function Motoristas() {
           setOriginalMotorista(null);
           recarregarMotoristas();
           navigate("/motoristas", { replace: true });
+          endRefresh();
         } else {
           toast.error(res?.message ?? "Erro ao atualizar motorista");
+          endRefresh();
         }
       } catch (e) {
         console.error(e);
         toast.error("Erro ao atualizar motorista");
+        endRefresh();
       }
       return;
     }
 
     try {
+      startRefresh();
       const res = await createMotoristaMutation.mutateAsync(finalPayload as any);
       if (res?.success) {
         setIsModalOpen(false);
         toast.success("Motorista cadastrado com sucesso!");
         setErrosCampos({});
+        endRefresh();
       } else {
         toast.error(res?.message || "Erro ao cadastrar motorista");
+        endRefresh();
       }
     } catch (e) {
       console.error(e);
       toast.error("Erro ao conectar com a API");
+      endRefresh();
     }
   };
 
@@ -511,6 +522,7 @@ export default function Motoristas() {
 
   return (
     <MainLayout title="Motoristas" subtitle="Gestão de motoristas">
+      <RefreshingIndicator isRefreshing={isRefreshing} />
       <PageHeader
         title="Motoristas"
         description="Gerencie sua equipe de motoristas"

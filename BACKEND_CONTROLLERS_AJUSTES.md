@@ -1,5 +1,98 @@
 # 🔧 Ajustes Necessários nos Controllers do Backend
 
+---
+
+## 🚨 BUG ATIVO — POST `/fazendas/:id/incrementar-volume`
+
+### Problema
+O frontend envia `{ toneladas, sacas, faturamento }` mas o backend só está incrementando `total_toneladas`.  
+Resultado: `total_sacas_carregadas` e `faturamento_total` nunca sobem nos cards da fazenda.
+
+### Payload recebido pelo backend (o que o frontend ENVIA)
+```json
+{
+  "toneladas": 20.0,
+  "sacas": 800,
+  "faturamento": 4000.00
+}
+```
+
+### ❌ SQL atual (incorreto)
+```sql
+UPDATE fazendas
+SET total_toneladas = total_toneladas + ?
+WHERE id = ?
+```
+
+### ✅ SQL correto (aplicar agora)
+```sql
+UPDATE fazendas
+SET
+  total_toneladas        = total_toneladas        + ?,
+  total_sacas_carregadas = total_sacas_carregadas + ?,
+  faturamento_total      = faturamento_total      + ?,
+  ultimo_frete           = CURDATE(),
+  updated_at             = CURRENT_TIMESTAMP
+WHERE id = ?
+-- params: [toneladas, sacas, faturamento, id]
+```
+
+### ✅ Controller correto — `fazendasController.js`
+```javascript
+async incrementarVolume(req, res) {
+  try {
+    const { id } = req.params;
+    const { toneladas, sacas = 0, faturamento = 0 } = req.body;
+
+    if (!toneladas || isNaN(Number(toneladas))) {
+      return res.status(400).json({ success: false, message: "Campo 'toneladas' é obrigatório" });
+    }
+
+    await db.query(
+      `UPDATE fazendas
+       SET
+         total_toneladas        = total_toneladas        + ?,
+         total_sacas_carregadas = total_sacas_carregadas + ?,
+         faturamento_total      = faturamento_total      + ?,
+         ultimo_frete           = CURDATE(),
+         updated_at             = CURRENT_TIMESTAMP
+       WHERE id = ?`,
+      [Number(toneladas), Number(sacas), Number(faturamento), id]
+    );
+
+    const [fazenda] = await db.query(`SELECT * FROM fazendas WHERE id = ?`, [id]);
+
+    return res.json({
+      success: true,
+      message: "Volume incrementado com sucesso",
+      data: fazenda[0] ?? fazenda
+    });
+  } catch (error) {
+    console.error("Erro ao incrementar volume:", error);
+    return res.status(500).json({ success: false, message: "Erro ao incrementar volume" });
+  }
+}
+```
+
+### ✅ Validação Zod/Joi (se usar schema validation)
+```javascript
+// Zod
+const incrementarSchema = z.object({
+  toneladas:  z.number().positive(),
+  sacas:      z.number().int().min(0).optional().default(0),
+  faturamento: z.number().min(0).optional().default(0),
+});
+
+// Joi
+const incrementarSchema = Joi.object({
+  toneladas:   Joi.number().positive().required(),
+  sacas:       Joi.number().integer().min(0).default(0),
+  faturamento: Joi.number().min(0).default(0),
+});
+```
+
+---
+
 ## 📊 Controller de Fazendas - CRÍTICO
 
 ### ✅ O que adicionar no GET `/fazendas`

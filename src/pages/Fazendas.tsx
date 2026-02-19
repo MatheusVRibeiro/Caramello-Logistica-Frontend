@@ -45,6 +45,8 @@ import {
 import { Plus, Package, Weight, DollarSign, Edit, MapPin, Info, TrendingUp, TrendingDown, Calendar, User, Sparkles, BarChart3, FileDown, CheckCircle2, Truck, AlertCircle, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { sortFazendasPorNome } from "@/lib/sortHelpers";
+import { RefreshingIndicator } from "@/components/shared/RefreshingIndicator";
+import { useRefreshData } from "@/hooks/useRefreshData";
 import jsPDF from "jspdf";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -104,6 +106,9 @@ export default function Fazendas() {
 
   // Mutation para deletar fazenda
   const deleteMutation = useDeletarFazenda();
+
+  // Hook para refresh de dados após mutações
+  const { isRefreshing, startRefresh, endRefresh } = useRefreshData();
 
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -220,18 +225,22 @@ export default function Fazendas() {
       }
 
       setIsSaving(true);
+      startRefresh();
       try {
         const res = await updateMutation.mutateAsync({ id: String(newProducao.id), data: delta as any });
         if (res?.success) {
           toast.success("Fazenda atualizada com sucesso");
           setIsModalOpen(false);
           navigate("/fazendas", { replace: true });
+          endRefresh();
         } else {
           toast.error(res?.message || "Erro ao atualizar fazenda");
+          endRefresh();
         }
       } catch (e) {
         console.error(e);
         toast.error("Erro ao atualizar fazenda");
+        endRefresh();
       } finally {
         setIsSaving(false);
       }
@@ -248,18 +257,22 @@ export default function Fazendas() {
       };
 
       setIsSaving(true);
+      startRefresh();
       try {
         const res = await createMutation.mutateAsync(payload as any);
         if (res?.success) {
           toast.success("Fazenda criada com sucesso");
           setIsModalOpen(false);
           navigate("/fazendas", { replace: true });
+          endRefresh();
         } else {
           toast.error(res?.message || "Erro ao criar fazenda");
+          endRefresh();
         }
       } catch (e) {
         console.error(e);
         toast.error("Erro ao criar fazenda");
+        endRefresh();
       } finally {
         setIsSaving(false);
       }
@@ -267,7 +280,7 @@ export default function Fazendas() {
   };
 
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = ITEMS_PER_PAGE;
+  const itemsPerPage = 9;
 
   const filteredData = sortFazendasPorNome(
     fazendas.filter(
@@ -277,7 +290,15 @@ export default function Fazendas() {
         (p.variedade?.toLowerCase() || "").includes(search.toLowerCase()) ||
         (p.proprietario?.toLowerCase() || "").includes(search.toLowerCase())
     )
-  );
+  ).sort((a, b) => {
+    // Fazendas com atividade (sendo consumidas) primeiro
+    const aAtiva = (a.total_sacas_carregadas || 0) > 0 || (a.total_toneladas || 0) > 0;
+    const bAtiva = (b.total_sacas_carregadas || 0) > 0 || (b.total_toneladas || 0) > 0;
+    if (aAtiva && !bAtiva) return -1;
+    if (!aAtiva && bAtiva) return 1;
+    // Dentro do mesmo grupo, ordem alfabética
+    return a.fazenda.localeCompare(b.fazenda, "pt-BR", { sensitivity: "base" });
+  });
 
   // Lógica de paginação
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
@@ -364,9 +385,9 @@ export default function Fazendas() {
     doc.rect(0, 0, 210, 32, "F");
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setTextColor(255, 255, 255);
-    doc.text("Caramello Logistica", 14, 18);
+    doc.text("Transportadora Transcontelli", 14, 18);
 
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
@@ -415,9 +436,9 @@ export default function Fazendas() {
     doc.setTextColor(0, 0, 0);
 
     // ==================== RESUMO ====================
-    const precoPorSaca = (fazenda.preco_por_tonelada * fazenda.peso_medio_saca) / 1000;
-    const faturamentoPorTon = fazenda.total_toneladas > 0
-      ? fazenda.faturamento_total / fazenda.total_toneladas
+    const precoPorSaca = ((fazenda.preco_por_tonelada ?? 0) * (fazenda.peso_medio_saca ?? 25)) / 1000;
+    const faturamentoPorTon = (fazenda.total_toneladas ?? 0) > 0
+      ? (fazenda.faturamento_total ?? 0) / (fazenda.total_toneladas ?? 1)
       : 0;
 
     let y = 75;
@@ -446,21 +467,22 @@ export default function Fazendas() {
     card(
       14,
       "Sacas carregadas",
-      fazenda.total_sacas_carregadas.toLocaleString("pt-BR"),
+      (fazenda.total_sacas_carregadas ?? 0).toLocaleString("pt-BR"),
       [37, 99, 235],
       [239, 246, 255]
     );
     card(
       76,
       "Toneladas",
-      fazenda.total_toneladas.toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
+      (fazenda.total_toneladas ?? 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 }),
       [30, 64, 175],
       [224, 231, 255]
     );
     card(
       138,
       "Faturamento",
-      `R$ ${fazenda.faturamento_total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      `R$ ${(fazenda.faturamento_total ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+
       [22, 163, 74],
       [220, 252, 231]
     );
@@ -485,12 +507,12 @@ export default function Fazendas() {
     doc.setFont("helvetica", "bold");
     doc.text("Último frete:", 18, y);
     doc.setFont("helvetica", "normal");
-    doc.text(fazenda.ultimo_frete, 50, y);
+    doc.text(fazenda.ultimo_frete ?? "Não realizado", 50, y);
     y += 6;
     doc.setFont("helvetica", "bold");
     doc.text("Preço por tonelada:", 18, y);
     doc.setFont("helvetica", "normal");
-    doc.text(`R$ ${fazenda.preco_por_tonelada.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 60, y);
+    doc.text(`R$ ${(fazenda.preco_por_tonelada ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, 60, y);
     y += 6;
     doc.setFont("helvetica", "bold");
     doc.text("Preço por saca:", 18, y);
@@ -500,7 +522,7 @@ export default function Fazendas() {
     doc.setFont("helvetica", "bold");
     doc.text("Peso médio por saca:", 18, y);
     doc.setFont("helvetica", "normal");
-    doc.text(`${fazenda.peso_medio_saca}kg`, 64, y);
+    doc.text(`${fazenda.peso_medio_saca ?? 25}kg`, 64, y);
     y += 6;
     doc.setFont("helvetica", "bold");
     doc.text("Faturamento por tonelada:", 18, y);
@@ -513,7 +535,7 @@ export default function Fazendas() {
     doc.line(14, 285, 196, 285);
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text("Caramello Logistica - Sistema de Gestao de Fretes", 14, 288);
+    doc.text("Sistema de gestão de fretes", 14, 288);
     doc.text("Pagina 1 de 1", 105, 288, { align: "center" });
     doc.text("Relatorio Confidencial", 196, 288, { align: "right" });
 
@@ -521,7 +543,7 @@ export default function Fazendas() {
     doc.setTextColor(148, 163, 184);
     doc.text("Este documento foi gerado automaticamente e contem informacoes confidenciais", 105, 292, { align: "center" });
 
-    const nomeArquivo = `Caramello_Logistica_Producao_${fazenda.fazenda.replace(/\s+/g, "_")}.pdf`;
+    const nomeArquivo = `Relatorio_Producao_Transcontelli_${fazenda.fazenda.replace(/\s+/g, "_")}.pdf`;
     doc.save(nomeArquivo);
     toast.success(`PDF "${nomeArquivo}" gerado com sucesso!`);
   };
@@ -531,6 +553,7 @@ export default function Fazendas() {
       title="Fazendas"
       subtitle="Gestão de produção por fazenda"
     >
+      <RefreshingIndicator isRefreshing={isRefreshing} />
       {isLoading ? (
         <div className="flex items-center justify-center h-96">
           <div className="text-center space-y-4">
@@ -1089,79 +1112,6 @@ export default function Fazendas() {
                           )}
           </div>
         </div>
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-6 flex justify-center">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCurrentPage(Math.max(1, currentPage - 1));
-                    }}
-                    className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                  const isCurrentPage = page === currentPage;
-                  const isVisible = Math.abs(page - currentPage) <= 1 || page === 1 || page === totalPages;
-
-                  if (!isVisible) {
-                    return null;
-                  }
-
-                  if (page === 2 && currentPage > 3) {
-                    return (
-                      <PaginationItem key="ellipsis-start">
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    );
-                  }
-
-                  if (page === totalPages - 1 && currentPage < totalPages - 2) {
-                    return (
-                      <PaginationItem key="ellipsis-end">
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    );
-                  }
-
-                  return (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage(page);
-                        }}
-                        isActive={isCurrentPage}
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                })}
-
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCurrentPage(Math.min(totalPages, currentPage + 1));
-                    }}
-                    className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-            <div className="text-xs text-muted-foreground ml-4 flex items-center">
-              Página {currentPage} de {totalPages} • {filteredData.length} registros
-            </div>
-          </div>
-        )}
 
         {/* Empty State */}
         {filteredData.length === 0 && (

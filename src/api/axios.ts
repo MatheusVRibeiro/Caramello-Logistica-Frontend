@@ -58,12 +58,27 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
     const status = error.response?.status;
+    const responseMessage = (error.response?.data as { message?: string; error?: string } | undefined)?.message
+      || (error.response?.data as { message?: string; error?: string } | undefined)?.error;
+
+    // Verificar se é erro de autenticação por mensagens típicas
+    const isAuthError = 
+      status === 401 ||
+      responseMessage?.toLowerCase().includes("token não fornecido") ||
+      responseMessage?.toLowerCase().includes("token inválido") ||
+      responseMessage?.toLowerCase().includes("token expirado") ||
+      responseMessage?.toLowerCase().includes("não autorizado") ||
+      responseMessage?.toLowerCase().includes("sessão expirada") ||
+      responseMessage?.toLowerCase().includes("use post /login") ||
+      responseMessage?.toLowerCase().includes("use post /auth/login");
+
+    // Se for erro de autenticação (não importa o status), redirecionar para login
+    if (isAuthError && !shouldSkipRefresh(originalRequest)) {
+      redirectToLoginAfterSessionExpiration();
+      return Promise.reject(error);
+    }
 
     if (status !== 401 || !originalRequest || originalRequest._retry || shouldSkipRefresh(originalRequest)) {
-      if (status === 401 && !shouldSkipRefresh(originalRequest)) {
-        redirectToLoginAfterSessionExpiration();
-      }
-
       if (status === 400 || status === 422 || status === 500) {
         toast.error(getFriendlyErrorMessage(error));
       }

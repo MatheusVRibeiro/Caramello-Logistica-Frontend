@@ -138,10 +138,15 @@ const deletarFazenda = async (id: string): Promise<ApiResponse<void>> => {
 
 const incrementarVolumeTransportado = async (
   id: string,
-  toneladas: number
+  toneladas: number,
+  sacas?: number,
+  faturamento?: number
 ): Promise<ApiResponse<Fazenda>> => {
   try {
-    const res = await api.post(`/fazendas/${id}/incrementar-volume`, { toneladas });
+    const body: Record<string, number> = { toneladas };
+    if (sacas !== undefined) body.sacas = sacas;
+    if (faturamento !== undefined) body.faturamento = faturamento;
+    const res = await api.post(`/fazendas/${id}/incrementar-volume`, body);
     const data = normalizeSingleResponse(res.data.data || res.data);
     return { success: true, data, status: res.status };
   } catch (err: unknown) {

@@ -72,6 +72,8 @@ import { ptBR } from "date-fns/locale";
 import { cn, shortName } from "@/lib/utils";
 import { toast } from "sonner";
 import { ITEMS_PER_PAGE } from "@/lib/pagination";
+import { RefreshingIndicator } from "@/components/shared/RefreshingIndicator";
+import { useRefreshData } from "@/hooks/useRefreshData";
 
 // PDF helpers
 import jsPDF from "jspdf";
@@ -136,6 +138,7 @@ const statusConfig = {
 
 export default function Pagamentos() {
   const queryClient = useQueryClient();
+  const { isRefreshing, startRefresh, endRefresh } = useRefreshData();
 
   const { data: pagamentosResponse, isLoading: isLoadingPagamentos } = useQuery<ApiResponse<Pagamento[]>>({
     queryKey: ["pagamentos"],
@@ -377,9 +380,11 @@ export default function Pagamentos() {
         setIsModalOpen(false);
         setSelectedFretes([]);
         setIsSaving(false);
+        endRefresh();
       } else {
         toast.error(response.message || "Erro ao criar pagamento");
         setIsSaving(false);
+        endRefresh();
       }
     },
     onError: (error: any) => {
@@ -387,6 +392,7 @@ export default function Pagamentos() {
       const msg = isNetwork ? "Erro de rede, tente novamente" : (error?.response?.data?.message || error?.message || "Erro ao criar pagamento");
       toast.error(msg);
       setIsSaving(false);
+      endRefresh();
       // If backend indicates some fretes already paid, refresh pending list to sync UI
       if (String(msg).toLowerCase().includes("alguns fretes ja") || String(msg).toLowerCase().includes("alguns fretes já") || String(msg).toLowerCase().includes("já estão pagos")) {
         if (motoristaIdForPendentes) {
@@ -409,9 +415,11 @@ export default function Pagamentos() {
         toast.success("Pagamento atualizado com sucesso!");
         setIsModalOpen(false);
         setIsSaving(false);
+        endRefresh();
       } else {
         toast.error(response.message || "Erro ao atualizar pagamento");
         setIsSaving(false);
+        endRefresh();
       }
     },
     onError: (error: any) => {
@@ -419,6 +427,7 @@ export default function Pagamentos() {
       const msg = isNetwork ? "Erro de rede, tente novamente" : (error?.response?.data?.message || error?.message || "Erro ao atualizar pagamento");
       toast.error(msg);
       setIsSaving(false);
+      endRefresh();
       if (String(msg).toLowerCase().includes("alguns fretes ja") || String(msg).toLowerCase().includes("alguns fretes já") || String(msg).toLowerCase().includes("já estão pagos")) {
         if (motoristaIdForPendentes) {
           queryClient.invalidateQueries({ queryKey: ["fretes", "pendentes", motoristaIdForPendentes] });
@@ -634,8 +643,10 @@ export default function Pagamentos() {
     };
 
     if (isEditing && editedPagamento.id) {
+      startRefresh();
       updateMutation.mutate({ id: editedPagamento.id, data: payload });
     } else {
+      startRefresh();
       createMutation.mutate(payload);
     }
   };
@@ -685,12 +696,13 @@ export default function Pagamentos() {
     
     // Logo/Nome da empresa em branco
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
-    doc.text("Caramello Logistica", 105, 18, { align: "center" });
+    doc.text("Transportadora Transcontelli", 105, 18, { align: "center" });
     
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
+    doc.text("Relatório de Pagamentos", 105, 25, { align: "center" });
     
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
@@ -701,10 +713,11 @@ export default function Pagamentos() {
     const nomeFormatado = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
     
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
+    doc.setFont("helvetica", "bold");
     doc.text(`Período de Referência: ${nomeFormatado}`, 105, 42, { align: "center" });
     
     doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
     doc.text(`Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, 105, 47, { align: "center" });
     
     doc.setTextColor(0, 0, 0);
@@ -1016,7 +1029,7 @@ export default function Pagamentos() {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
       
-      doc.text("Caramello Logistica - Sistema de Gestao de Fretes", 20, 285);
+      doc.text("Sistema de gestão de fretes", 20, 285);
       doc.text(`Pagina ${i} de ${pageCount}`, 105, 285, { align: "center" });
       doc.text(`Relatorio Confidencial`, 190, 285, { align: "right" });
       
@@ -1026,7 +1039,7 @@ export default function Pagamentos() {
     }
     
     // ==================== DOWNLOAD ====================
-    const nomeArquivo = `Caramello_Logistica_Pagamentos_${selectedPeriodo.replace("-", "_")}.pdf`;
+    const nomeArquivo = `Relatorio_Pagamentos_Transcontelli_${selectedPeriodo.replace("-", "_")}.pdf`;
     doc.save(nomeArquivo);
     toast.success(`PDF "${nomeArquivo}" gerado com sucesso!`, { duration: 4000 });
   };
@@ -1155,6 +1168,7 @@ export default function Pagamentos() {
 
   return (
     <MainLayout title="Pagamentos" subtitle="Registro de pagamentos de motoristas">
+      <RefreshingIndicator isRefreshing={isRefreshing} />
       <PageHeader
         title="Pagamentos de Motoristas"
         description="Registre e acompanhe os pagamentos pelos fretes realizados"

@@ -45,6 +45,8 @@ import { sortMotoristasPorNome } from "@/lib/sortHelpers";
 import { formatarDocumento } from '@/utils/formatters';
 import { ITEMS_PER_PAGE } from "@/lib/pagination";
 import { ModalSubmitFooter } from "@/components/shared/ModalSubmitFooter";
+import { RefreshingIndicator } from "@/components/shared/RefreshingIndicator";
+import { useRefreshData } from "@/hooks/useRefreshData";
 
 const statusConfig = {
   disponivel: { label: "Disponível", variant: "active" as const },
@@ -64,6 +66,7 @@ export default function Frota() {
   const [editedCaminhao, setEditedCaminhao] = useState<Partial<CriarCaminhaoPayload>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = ITEMS_PER_PAGE;
+  const { isRefreshing, startRefresh, endRefresh } = useRefreshData();
 
   // Query para buscar caminhões
   const { data: caminhoesResponse, isLoading } = useQuery({
@@ -119,12 +122,15 @@ export default function Frota() {
           toast.success("Caminhão cadastrado com sucesso!");
           queryClient.invalidateQueries({ queryKey: ["caminhoes"] });
           setIsModalOpen(false);
+          endRefresh();
         } else {
           toast.error(response.message || "Erro ao cadastrar caminhão");
+          endRefresh();
         }
     },
     onError: () => {
       toast.error("Erro ao cadastrar caminhão");
+      endRefresh();
     },
   });
 
@@ -137,12 +143,15 @@ export default function Frota() {
         toast.success("Caminhão atualizado com sucesso!");
         queryClient.invalidateQueries({ queryKey: ["caminhoes"] });
         setIsModalOpen(false);
+        endRefresh();
       } else {
         toast.error(response.message || "Erro ao atualizar caminhão");
+        endRefresh();
       }
     },
     onError: () => {
       toast.error("Erro ao atualizar caminhão");
+      endRefresh();
     },
   });
   const isSaving = criarMutation.status === "pending" || editarMutation.status === "pending";
@@ -662,6 +671,7 @@ export default function Frota() {
 
   return (
     <MainLayout title="Frota" subtitle="Gestão da frota">
+      <RefreshingIndicator isRefreshing={isRefreshing} />
       <PageHeader
         title="Frota de Veículos"
         description="Gestão completa da frota, documentação e manutenção"

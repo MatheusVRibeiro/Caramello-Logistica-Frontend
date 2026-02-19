@@ -62,6 +62,8 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ITEMS_PER_PAGE } from "@/lib/pagination";
+import { RefreshingIndicator } from "@/components/shared/RefreshingIndicator";
+import { useRefreshData } from "@/hooks/useRefreshData";
 
 const tipoConfig = {
   combustivel: { label: "Combustível", icon: Fuel, color: "text-warning" },
@@ -72,6 +74,7 @@ const tipoConfig = {
 
 export default function Custos() {
   const queryClient = useQueryClient();
+  const { isRefreshing, startRefresh, endRefresh } = useRefreshData();
 
   // Query para listar custos
   const { data: custosResponse, isLoading } = useQuery({
@@ -111,12 +114,15 @@ export default function Custos() {
         toast.success("Custo cadastrado com sucesso!");
         setEditingCusto(null);
         setIsModalOpen(false);
+        endRefresh();
       } else {
         toast.error(response.message || "Erro ao cadastrar custo");
+        endRefresh();
       }
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || "Erro ao cadastrar custo");
+      endRefresh();
     },
   });
 
@@ -130,12 +136,15 @@ export default function Custos() {
         toast.success("Custo atualizado com sucesso!");
         setEditingCusto(null);
         setIsModalOpen(false);
+        endRefresh();
       } else {
         toast.error(response.message || "Erro ao atualizar custo");
+        endRefresh();
       }
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || "Erro ao atualizar custo");
+      endRefresh();
     },
   });
 
@@ -148,16 +157,20 @@ export default function Custos() {
         toast.success("Custo removido com sucesso!");
         setIsDetailsOpen(false);
         setSelectedCusto(null);
+        endRefresh();
       } else {
         toast.error(response.message || "Erro ao remover custo");
+        endRefresh();
       }
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || "Erro ao remover custo");
+      endRefresh();
     },
   });
 
   const [search, setSearch] = useState("");
+  const isSaving = createMutation.status === "pending" || updateMutation.status === "pending" || deleteMutation.status === "pending";
   const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [motoristaFilter, setMotoristaFilter] = useState<string>("all");
   const [comprovanteFilter, setComprovanteFilter] = useState<string>("all");
@@ -269,14 +282,17 @@ export default function Custos() {
     };
 
     if (editingCusto) {
+      startRefresh();
       updateMutation.mutate({ id: editingCusto.id, data: payload });
     } else {
+      startRefresh();
       createMutation.mutate(payload);
     }
   };
 
   const handleDelete = (custo: Custo) => {
     if (window.confirm("Tem certeza que deseja deletar este custo?")) {
+      startRefresh();
       deleteMutation.mutate(custo.id);
     }
   };
@@ -538,6 +554,7 @@ export default function Custos() {
 
   return (
     <MainLayout title="Custos" subtitle="Gestão de custos operacionais">
+      <RefreshingIndicator isRefreshing={isRefreshing} />
       <PageHeader
         title="Custos"
         description="Controle de custos por frete e tipo"

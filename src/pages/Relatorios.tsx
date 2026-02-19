@@ -449,9 +449,11 @@ export default function Relatorios() {
       doc.addImage(logo, "PNG", 14, 10, 24, 24);
     }
 
-    doc.setFontSize(16);
-    doc.text("Caramello Logística", 42, 18);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Transportadora Transcontelli", 42, 18);
     doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
     doc.text("Relatório de Fretes Filtrados", 42, 25);
     doc.text(`Período: ${relatorioMotorista.periodo}`, 14, 42);
 

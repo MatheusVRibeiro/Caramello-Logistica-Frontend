@@ -61,6 +61,8 @@ import { Plus, MapPin, ArrowRight, Truck, Package, DollarSign, TrendingUp, Edit,
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { sortMotoristasPorNome, sortFazendasPorNome } from "@/lib/sortHelpers";
+import { RefreshingIndicator } from "@/components/shared/RefreshingIndicator";
+import { useRefreshData } from "@/hooks/useRefreshData";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import jsPDF from "jspdf";
@@ -275,6 +277,7 @@ export default function Fretes() {
   const [caminhoesDoMotorista, setCaminhoesDoMotorista] = useState<any[]>([]);
   const [carregandoCaminhoes, setCarregandoCaminhoes] = useState(false);
   const [erroCaminhoes, setErroCaminhoes] = useState<string>("");
+  const { isRefreshing, startRefresh, endRefresh } = useRefreshData();
   
   // Estados para Exercício (Ano/Mês) e Fechamento
   const [tipoVisualizacao, setTipoVisualizacao] = useState<"mensal" | "trimestral" | "semestral" | "anual">("mensal");
@@ -608,6 +611,7 @@ export default function Fretes() {
     };
 
     // Criar frete via API
+    startRefresh();
     const toastId = toast.loading("📦 Criando frete...");
     const res = await fretesService.criarFrete(payload);
     
@@ -619,11 +623,13 @@ export default function Fretes() {
         duration: 4000,
       });
       
-      // Incrementar volume transportado da fazenda
+      // Incrementar volume transportado da fazenda (toneladas, sacas e faturamento)
       if (newFrete.fazendaId) {
         const incrementRes = await fazendasService.incrementarVolumeTransportado(
           String(newFrete.fazendaId),
-          toneladas
+          toneladas,
+          quantidadeSacas,
+          receitaTotal
         );
         if (incrementRes.success) {
           toast.success("✅ Volume da fazenda atualizado!", { duration: 2000 });
@@ -651,12 +657,14 @@ export default function Fretes() {
         ticket: "",
       });
       setEstoqueSelecionado(null);
+      endRefresh();
     } else {
       toast.dismiss(toastId);
       toast.error("❌ Erro ao cadastrar frete", {
         description: res.message || "Tente novamente em alguns momentos.",
         duration: 4000,
       });
+      endRefresh();
     }
 
     setIsSavingFrete(false);
@@ -729,17 +737,13 @@ export default function Fretes() {
     doc.rect(0, 0, 210, 50, "F");
     
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
+    doc.setFontSize(20);
     doc.setFont("helvetica", "bold");
-    doc.text("Caramello Logistica", 105, 18, { align: "center" });
-    
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "normal");
-    doc.text("Fretes Inteligentes • Gestão de Fretes", 105, 25, { align: "center" });
+    doc.text("Transportadora Transcontelli", 105, 18, { align: "center" });
     
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("RELATÓRIO DE FRETES", 105, 35, { align: "center" });
+    doc.text("RELATÓRIO DE FRETES", 105, 30, { align: "center" });
     
     // Formatar nome do período baseado no tipo de visualização
     let nomeFormatado = "";
@@ -761,11 +765,12 @@ export default function Fretes() {
     }
     
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(`Período de Referência: ${nomeFormatado}`, 105, 42, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.text(`Período de Referência: ${nomeFormatado}`, 105, 39, { align: "center" });
     
     doc.setFontSize(8);
-    doc.text(`Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, 105, 47, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.text(`Emitido em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`, 105, 45, { align: "center" });
     
     doc.setTextColor(0, 0, 0);
     
@@ -940,7 +945,7 @@ export default function Fretes() {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
       
-      doc.text("Caramello Logistica - Sistema de Gestao de Fretes", 20, 285);
+      doc.text("Sistema de gestão de fretes", 20, 285);
       doc.text(`Pagina ${i} de ${pageCount}`, 105, 285, { align: "center" });
       doc.text(`Relatorio Confidencial`, 190, 285, { align: "right" });
       
@@ -949,7 +954,7 @@ export default function Fretes() {
       doc.text("Este documento foi gerado automaticamente e contem informacoes confidenciais", 105, 290, { align: "center" });
     }
     
-    const nomeArquivo = `Caramello_Logistica_Fretes_${selectedPeriodo.replace("-", "_")}.pdf`;
+    const nomeArquivo = `Relatorio_Fretes_Transcontelli_${selectedPeriodo.replace("-", "_")}.pdf`;
     doc.save(nomeArquivo);
     toast.success(`PDF "${nomeArquivo}" gerado com sucesso!`, { duration: 4000 });
   };
@@ -1244,6 +1249,7 @@ export default function Fretes() {
 
   return (
     <MainLayout title="Fretes" subtitle="Gestão de fretes e entregas">
+      <RefreshingIndicator isRefreshing={isRefreshing} />
       <PageHeader
         title="Fretes"
         description="Receita é o valor total do frete. Custos são adicionais (pedágios, diárias, etc.)"
