@@ -279,7 +279,8 @@ export const exportarGuiaPagamentoIndividual = (params: PagamentoPDFParams) => {
             textColor: [51, 65, 85],
         },
         alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: 15, right: 15 }
+        margin: { left: 15, right: 15 },
+        rowPageBreak: "avoid"
     });
 
     yPosition = (doc as any).lastAutoTable.finalY + 8;
@@ -334,6 +335,7 @@ export const exportarGuiaPagamentoIndividual = (params: PagamentoPDFParams) => {
             },
             alternateRowStyles: { fillColor: [248, 250, 252] },
             margin: { left: 15, right: 15 },
+            rowPageBreak: "avoid"
         });
     }
 

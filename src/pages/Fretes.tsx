@@ -65,7 +65,7 @@ import { Plus, MapPin, ArrowRight, Truck, Package, DollarSign, TrendingUp, Edit,
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { sortMotoristasPorNome, sortFazendasPorNome } from "@/lib/sortHelpers";
-import { formatarCodigoFrete, toNumber, getTodayInputDate, parseLocalInputDate, normalizeInputDate, normalizeFreteRef, isCustoFromFrete } from "@/utils/formatters";
+import { formatarCodigoFrete, toNumber, getTodayInputDate, parseLocalInputDate, normalizeInputDate, normalizeFreteRef, isCustoFromFrete, abreviarRota } from "@/utils/formatters";
 import { RefreshingIndicator } from "@/components/shared/RefreshingIndicator";
 import { FreteFormModal } from "@/components/fretes/FreteFormModal";
 import { FreteDetailsModal } from "@/components/fretes/FreteDetailsModal";
@@ -1192,7 +1192,7 @@ export default function Fretes() {
     return nome.trim();
   };
 
-  // Formata o código do frete para o padrão 'FRETE-YYYY-XXX' quando necessário
+  // Formata o código do frete para o padrão 'FRT-YYYY-XXX' quando necessário
   const formatFreteCodigo = (frete: Frete) => {
     if (!frete) return "";
     // Sequência estável apenas como fallback visual, quando backend ainda não devolver codigo_frete
@@ -1238,9 +1238,17 @@ export default function Fretes() {
       nomeFormatado = `Ano ${selectedPeriodo}`;
     }
 
+    let filtroMotoristaTexto = "";
+    if (motoristaFilter !== "all") {
+      const moto = motoristasState.find(m => String(m.id) === motoristaFilter);
+      if (moto) {
+        filtroMotoristaTexto = ` | Favorecido: ${moto.nome.toUpperCase()}`;
+      }
+    }
+
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text(`Período de Referência: ${nomeFormatado}`, 105, 39, { align: "center" });
+    doc.text(`Período: ${nomeFormatado}${filtroMotoristaTexto}`, 105, 39, { align: "center" });
 
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -1269,91 +1277,55 @@ export default function Fretes() {
 
     doc.setTextColor(0, 0, 0);
 
-    // Cards de resumo em 4 colunas
-    doc.setTextColor(0, 0, 0);
+    const drawCard = (x: number, y: number, w: number, h: number, title: string, value: string, bgColor: number[], borderColor: number[], titleColor: number[], valueColor: number[], subtitle?: string) => {
+      doc.setFillColor(bgColor[0], bgColor[1], bgColor[2]);
+      doc.roundedRect(x, y, w, h, 2, 2, "F");
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(x, y, w, h, 2, 2, "S");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(titleColor[0], titleColor[1], titleColor[2]);
+      doc.text(title, x + 3, y + 6);
+      doc.setFontSize(11);
+      doc.setTextColor(valueColor[0], valueColor[1], valueColor[2]);
+      doc.text(value, x + 3, y + 14);
+      if (subtitle) {
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(subtitle, x + 3, y + 20);
+      }
+    };
+
+    const cardTotalWidth = 180;
+    const gap = 3;
+    const cardWidth = (cardTotalWidth - (gap * 4)) / 5;
+    const cardH = 24;
+    let cX = 15;
 
     // Card 1 - Fretes
-    doc.setFillColor(219, 234, 254);
-    doc.roundedRect(15, yPosition, 42, 28, 2, 2, "F");
-    doc.setDrawColor(59, 130, 246);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(15, yPosition, 42, 28, 2, 2, "S");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text("Fretes", 20, yPosition + 5);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(37, 99, 235);
-    doc.text(`${qtdFretes}`, 20, yPosition + 13);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`no período`, 20, yPosition + 19);
+    drawCard(cX, yPosition, cardWidth, cardH, "Fretes", `${qtdFretes}`, [255, 247, 237], [249, 115, 22], [71, 85, 105], [234, 88, 12], "no período");
+    cX += cardWidth + gap;
 
     // Card 2 - Toneladas
-    doc.setFillColor(237, 233, 254);
-    doc.roundedRect(62, yPosition, 42, 28, 2, 2, "F");
-    doc.setDrawColor(139, 92, 246);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(62, yPosition, 42, 28, 2, 2, "S");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text("Toneladas", 67, yPosition + 5);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(139, 92, 246);
-    doc.text(`${totalToneladas.toFixed(1)}t`, 67, yPosition + 13);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    const totalSacas = filteredData.reduce((acc, f) => acc + f.quantidadeSacas, 0);
-    doc.text(`${totalSacas.toLocaleString("pt-BR")} sacas`, 67, yPosition + 19);
+    const totalSacas = filteredAllData.reduce((acc, f) => acc + f.quantidadeSacas, 0);
+    drawCard(cX, yPosition, cardWidth, cardH, "Toneladas", `${totalToneladas.toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).replace(",", ".")} t`, [250, 245, 255], [168, 85, 247], [71, 85, 105], [147, 51, 234], `${totalSacas.toLocaleString("pt-BR")} sacas`);
+    cX += cardWidth + gap;
 
     // Card 3 - Receita
-    doc.setFillColor(219, 234, 254);
-    doc.roundedRect(109, yPosition, 42, 28, 2, 2, "F");
-    doc.setDrawColor(59, 130, 246);
-    doc.roundedRect(109, yPosition, 42, 28, 2, 2, "S");
+    drawCard(cX, yPosition, cardWidth, cardH, "Receita", `R$ ${totalReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, [239, 246, 255], [59, 130, 246], [71, 85, 105], [37, 99, 235], "Bruto");
+    cX += cardWidth + gap;
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text("Receita", 114, yPosition + 5);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(37, 99, 235);
-    doc.text(`R$ ${(totalReceita / 1000).toFixed(1)}k`, 114, yPosition + 13);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Bruto`, 114, yPosition + 19);
+    // Card 4 - Descontos
+    const descText = totalCustos > 0 ? `-R$ ${totalCustos.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ 0,00`;
+    drawCard(cX, yPosition, cardWidth, cardH, "Descontos", descText, [254, 242, 242], [239, 68, 68], [71, 85, 105], [220, 38, 38]);
+    cX += cardWidth + gap;
 
-    // Card 4 - Lucro
-    doc.setFillColor(220, 252, 231);
-    doc.roundedRect(156, yPosition, 39, 28, 2, 2, "F");
-    doc.setDrawColor(34, 197, 94);
-    doc.setLineWidth(0.8);
-    doc.roundedRect(156, yPosition, 39, 28, 2, 2, "S");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(71, 85, 105);
-    doc.text("Lucro", 161, yPosition + 5);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(22, 163, 74);
-    doc.text(`R$ ${(totalLucro / 1000).toFixed(1)}k`, 161, yPosition + 13);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(100, 116, 139);
+    // Card 5 - Lucro
     const margem = totalReceita > 0 ? (totalLucro / totalReceita) * 100 : 0;
-    doc.text(`${margem.toFixed(1)}%`, 161, yPosition + 19);
+    drawCard(cX, yPosition, cardWidth, cardH, "Líquido", `R$ ${totalLucro.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, [240, 253, 244], [34, 197, 94], [71, 85, 105], [22, 163, 74], `Margem: ${margem.toFixed(1)}%`);
 
-    yPosition += 35;
+    yPosition += 32;
 
     // ==================== DETALHAMENTO DE FRETES ====================
     doc.setFillColor(241, 245, 249);
@@ -1366,44 +1338,56 @@ export default function Fretes() {
     yPosition += 12;
 
     // Tabela detalhada - USANDO FILTROS APLICADOS
-    const tableData = filteredAllData.map((f) => [
-      f.id,
-      `${f.origem} para ${f.destino}`,
-      f.motorista,
-      `${toNumber(f.toneladas).toFixed(1)}t`,
-      `R$ ${toNumber(f.receita).toLocaleString("pt-BR")}`,
-      `R$ ${toNumber(f.custos).toLocaleString("pt-BR")}`,
-      `R$ ${toNumber(f.resultado).toLocaleString("pt-BR")}`,
-    ]);
+    const tableData = filteredAllData.map((f) => {
+      let rotaFormatada = "";
+      const origemSegura = f.origem?.trim() || "";
+      const destinoSeguro = f.destino?.trim() || "";
+      if (origemSegura && destinoSeguro && origemSegura !== destinoSeguro) {
+        rotaFormatada = `${abreviarRota(origemSegura)} - ${abreviarRota(destinoSeguro)}`;
+      } else {
+        rotaFormatada = abreviarRota(f.origem || "");
+      }
+
+      return [
+        formatFreteCodigo(f),
+        rotaFormatada,
+        f.motorista,
+        `${toNumber(f.toneladas).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 }).replace(",", ".")} t`,
+        `R$ ${toNumber(f.receita).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        toNumber(f.custos) > 0 ? `-R$ ${toNumber(f.custos).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `R$ 0,00`,
+        `R$ ${toNumber(f.resultado).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      ];
+    });
 
     autoTable(doc, {
       startY: yPosition,
-      head: [["ID", "Rota", "Favorecido", "Carga", "Receita", "Custos", "Resultado"]],
+      head: [["ID", "Origem / Destino", "Favorecido", "Toneladas", "Receita", "Descontos", "Líquido"]],
       body: tableData,
       theme: "grid",
       headStyles: {
         fillColor: [37, 99, 235],
         textColor: [255, 255, 255],
         fontStyle: "bold",
-        fontSize: 10,
+        fontSize: 9.5,
         halign: "center",
       },
       styles: {
-        fontSize: 9,
+        fontSize: 8.5,
         cellPadding: 3,
       },
       columnStyles: {
-        0: { cellWidth: 22, halign: "center", fontStyle: "bold", fontSize: 9 },
-        1: { cellWidth: 48, fontSize: 9 },
-        2: { cellWidth: 32, fontSize: 9 },
-        3: { cellWidth: 16, halign: "center", fontSize: 9 },
-        4: { cellWidth: 20, halign: "right", fontSize: 9 },
-        5: { cellWidth: 20, halign: "right", textColor: [220, 38, 38], fontSize: 9 },
-        6: { cellWidth: 20, halign: "right", fontStyle: "bold", textColor: [22, 163, 74], fontSize: 9 },
+        0: { cellWidth: 20, halign: "center", fontStyle: "bold", fontSize: 8.5 },
+        1: { cellWidth: 46, fontSize: 8.5 },
+        2: { cellWidth: 32, fontSize: 8.5 },
+        3: { cellWidth: 18, halign: "right", fontSize: 8.5, fontStyle: "bold" },
+        4: { cellWidth: 22, halign: "right", fontSize: 8.5, fontStyle: "bold" },
+        5: { cellWidth: 22, halign: "right", textColor: [220, 38, 38], fontSize: 8.5, fontStyle: "bold" },
+        6: { cellWidth: 22, halign: "right", fontStyle: "bold", textColor: [21, 128, 61], fontSize: 8.5 },
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252],
       },
+      rowPageBreak: "avoid",
     });
 
     // ==================== FOOTER EM TODAS AS PÁGINAS ====================
@@ -1419,8 +1403,8 @@ export default function Fretes() {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100, 116, 139);
 
-      doc.text("Sistema de gestão de fretes", 20, 285);
-      doc.text(`Pagina ${i} de ${pageCount}`, 105, 285, { align: "center" });
+      doc.text("Sistema de Gestão de Fretes", 20, 285);
+      doc.text(`Página ${i} de ${pageCount}`, 105, 285, { align: "center" });
       doc.text(`Relatorio Confidencial`, 190, 285, { align: "right" });
 
       doc.setFontSize(6);

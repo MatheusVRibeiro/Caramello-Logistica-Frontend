@@ -24,21 +24,21 @@ export const formatarCodigoFrete = (
   const year = Number.isNaN(parsedDate.getTime()) ? new Date().getFullYear() : parsedDate.getFullYear();
 
   if (raw) {
-    const matchFrete = raw.match(/^FRETE-(\d{4})-(\d{1,})$/i);
+    const matchFrete = raw.match(/^(?:FRETE|FRT)-(\d{4})-(\d{1,})$/i);
     if (matchFrete) {
-      return `FRETE-${matchFrete[1]}-${matchFrete[2].padStart(3, "0")}`;
+      return `FRT-${matchFrete[1]}-${matchFrete[2].padStart(3, "0")}`;
     }
 
     const numericId = raw.match(/^\d+$/);
     if (numericId) {
-      return `FRETE-${year}-${raw.padStart(3, "0")}`;
+      return `FRT-${year}-${raw.padStart(3, "0")}`;
     }
 
     return raw.toUpperCase();
   }
 
   if (typeof fallbackSeq === "number") {
-    return `FRETE-${year}-${String(fallbackSeq).padStart(3, "0")}`;
+    return `FRT-${year}-${String(fallbackSeq).padStart(3, "0")}`;
   }
 
   return "";
